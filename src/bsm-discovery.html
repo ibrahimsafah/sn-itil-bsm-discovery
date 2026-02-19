@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BSM Hypergraph Discovery</title>
+  <link rel="stylesheet" href="bsm-discovery.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>BSM Discovery</h1>
+        <div class="subtitle">ITIL Hypergraph Explorer</div>
+      </div>
+
+      <!-- View Toggle -->
+      <div class="sidebar-section">
+        <h3>Perspective</h3>
+        <div class="view-toggle">
+          <button id="btn-original" class="active">Entities → Changes</button>
+          <button id="btn-transposed">Changes → Entities</button>
+        </div>
+        <div class="view-toggle" style="margin-top: 6px;">
+          <button id="btn-upset" title="UpSet intersection plot">UpSet Intersections</button>
+        </div>
+        <div style="margin-top: 8px; text-align: center;">
+          <span id="view-label" style="font-size: 10px; color: var(--text-muted);">Original (H)</span>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="sidebar-section">
+        <h3>Statistics</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-nodes">—</div>
+            <div class="stat-label" id="stat-nodes-label">Entity Nodes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-edges">—</div>
+            <div class="stat-label" id="stat-edges-label">Change Hyperedges</div>
+          </div>
+          <div class="stat-card wide">
+            <div class="stat-row">
+              <span class="stat-label">Density</span>
+              <span class="stat-value" id="stat-density">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Avg Degree</span>
+              <span class="stat-value" id="stat-avg-degree">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Max Degree</span>
+              <span class="stat-value" id="stat-max-degree">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Avg Edge Size</span>
+              <span class="stat-value" id="stat-avg-edge-size">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="sidebar-section">
+        <h3>Search</h3>
+        <input type="text" id="search-input" class="search-input" placeholder="Filter nodes by name…">
+      </div>
+
+      <!-- Legend -->
+      <div class="sidebar-section">
+        <h3>Legend</h3>
+        <div class="legend-list">
+          <div class="legend-item" data-type="ci">
+            <div class="legend-dot" style="background: var(--accent-blue);"></div>
+            <span class="legend-label">Configuration Items</span>
+            <span class="legend-count" data-type="ci">0</span>
+          </div>
+          <div class="legend-item" data-type="group">
+            <div class="legend-dot" style="background: var(--accent-orange);"></div>
+            <span class="legend-label">Support Groups</span>
+            <span class="legend-count" data-type="group">0</span>
+          </div>
+          <div class="legend-item" data-type="service">
+            <div class="legend-dot" style="background: var(--accent-green);"></div>
+            <span class="legend-label">Business Services</span>
+            <span class="legend-count" data-type="service">0</span>
+          </div>
+          <div class="legend-item" data-type="change">
+            <div class="legend-dot" style="background: var(--accent-purple);"></div>
+            <span class="legend-label">Change Requests</span>
+            <span class="legend-count" data-type="change">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Co-occurrence -->
+      <div class="sidebar-section" id="cooccurrence-section">
+        <h3>CI Co-occurrence</h3>
+        <div class="cooccurrence-filter">
+          <button class="cooccurrence-type-btn active" data-filter="">All</button>
+          <button class="cooccurrence-type-btn" data-filter="ci">CIs</button>
+          <button class="cooccurrence-type-btn" data-filter="group">Groups</button>
+          <button class="cooccurrence-type-btn" data-filter="service">Services</button>
+        </div>
+        <div id="cooccurrence-body"></div>
+      </div>
+
+      <!-- Force Controls -->
+      <div class="sidebar-section">
+        <h3>Force Controls</h3>
+        <div class="control-group">
+          <div class="control-label">
+            <span>Repulsion</span>
+            <span class="control-value" id="charge-value">-350</span>
+          </div>
+          <input type="range" id="charge-slider" min="-600" max="-50" value="-350" step="10">
+        </div>
+        <div class="control-group">
+          <div class="control-label">
+            <span>Link Distance</span>
+            <span class="control-value" id="link-value">180</span>
+          </div>
+          <input type="range" id="link-slider" min="40" max="400" value="180" step="10">
+        </div>
+      </div>
+
+      <!-- Node Detail -->
+      <div class="sidebar-section node-detail" id="node-detail">
+        <div class="node-detail-header">
+          <h3>Node Detail</h3>
+          <button class="node-detail-close" id="detail-close">✕</button>
+        </div>
+        <span class="node-detail-badge" id="detail-badge"></span>
+        <div class="node-detail-name" id="detail-name"></div>
+        <div id="detail-body" style="margin-top: 8px;"></div>
+      </div>
+    </aside>
+
+    <!-- Graph Area -->
+    <main class="graph-container" id="graph-container">
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loading-text">Initializing…</div>
+      </div>
+      <button class="analytics-toggle-btn" id="analytics-toggle" title="Toggle Analytics Panel">Analytics ▶</button>
+    </main>
+
+    <!-- Analytics Panel (right side) -->
+    <aside class="analytics-panel" id="analytics-panel">
+      <div class="analytics-header">
+        <h2>Analytics</h2>
+        <button class="analytics-collapse-btn" id="analytics-collapse" title="Collapse">&#x2715;</button>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="analytics-tabs">
+        <button class="analytics-tab active" data-tab="centrality">Centrality</button>
+        <button class="analytics-tab" data-tab="temporal">Temporal</button>
+        <button class="analytics-tab" data-tab="anomalies">Anomalies</button>
+        <button class="analytics-tab" data-tab="clusters">Clusters</button>
+        <button class="analytics-tab" data-tab="impact">Impact</button>
+        <button class="analytics-tab" data-tab="incidents">Incidents</button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="analytics-content">
+        <!-- Centrality Tab -->
+        <div class="analytics-tab-content active" id="tab-centrality">
+          <div class="analytics-sub-section">
+            <h4>Critical Nodes</h4>
+            <div class="analytics-description">Nodes ranked by composite centrality score (degree + betweenness + eigenvector)</div>
+            <div class="centrality-metric-toggle">
+              <button class="metric-btn active" data-metric="composite">Composite</button>
+              <button class="metric-btn" data-metric="degree">Degree</button>
+              <button class="metric-btn" data-metric="betweenness">Betweenness</button>
+              <button class="metric-btn" data-metric="eigenvector">Eigenvector</button>
+            </div>
+            <div id="centrality-rankings"></div>
+          </div>
+        </div>
+
+        <!-- Temporal Tab -->
+        <div class="analytics-tab-content" id="tab-temporal">
+          <div class="analytics-sub-section">
+            <h4>Change Cascades</h4>
+            <div class="analytics-description">CI pairs where changes to one frequently trigger changes to another within 7 days</div>
+            <div id="cascade-list"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Change Velocity</h4>
+            <div class="analytics-description">CIs with increasing change frequency (potential instability)</div>
+            <div id="velocity-list"></div>
+          </div>
+        </div>
+
+        <!-- Anomalies Tab -->
+        <div class="analytics-tab-content" id="tab-anomalies">
+          <div class="analytics-sub-section">
+            <h4>Risk Heatmap</h4>
+            <div class="analytics-description">CIs ranked by composite risk score</div>
+            <div id="risk-heatmap"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Unexpected Pairs</h4>
+            <div class="analytics-description">CI pairs that co-occur far more than statistically expected</div>
+            <div id="unexpected-pairs"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Orphan CIs</h4>
+            <div class="analytics-description">CIs rarely or never appearing in changes — blind spots in change management</div>
+            <div id="orphan-list"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Over-Coupled Pairs</h4>
+            <div class="analytics-description">CIs with Jaccard similarity > 0.5 — excessive dependency risk</div>
+            <div id="overcoupled-list"></div>
+          </div>
+        </div>
+
+        <!-- Clusters Tab -->
+        <div class="analytics-tab-content" id="tab-clusters">
+          <div class="analytics-sub-section">
+            <h4>Detected Communities</h4>
+            <div class="analytics-description">Algorithmically discovered CI groups (Louvain method)</div>
+            <div id="cluster-summary"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Cluster Details</h4>
+            <div id="cluster-details"></div>
+          </div>
+        </div>
+
+        <!-- Impact Tab -->
+        <div class="analytics-tab-content" id="tab-impact">
+          <div class="analytics-sub-section">
+            <h4>Impact Predictor</h4>
+            <div class="analytics-description">Select a CI to predict change impact radius</div>
+            <select id="impact-ci-select" class="analytics-select">
+              <option value="">Select a CI...</option>
+            </select>
+            <div id="impact-results"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Predicted Links</h4>
+            <div class="analytics-description">CI pairs likely to appear together in future changes (Adamic-Adar index)</div>
+            <div id="predicted-links"></div>
+          </div>
+        </div>
+
+        <!-- Incidents Tab -->
+        <div class="analytics-tab-content" id="tab-incidents">
+          <div class="analytics-sub-section">
+            <h4>Fault Propagation</h4>
+            <div class="analytics-description">CIs where incidents cascade to other CIs</div>
+            <div id="fault-propagation"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Incident Hotspots</h4>
+            <div class="analytics-description">CIs with highest incident frequency</div>
+            <div id="incident-hotspots"></div>
+          </div>
+          <div class="analytics-sub-section">
+            <h4>Service Fingerprints</h4>
+            <div class="analytics-description">How incidents distribute across each business service's CIs</div>
+            <div id="service-fingerprints"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Application Scripts -->
+  <script src="ITILDataSimulator.js"></script>
+  <script src="HypergraphCore.js"></script>
+  <script src="BSMHypergraphRenderer.js"></script>
+  <script src="AnalyticsEngine.js"></script>
+  <script src="UpSetRenderer.js"></script>
+  <script src="BSMDiscovery.js"></script>
+  <script>
+    var app = new BSMDiscovery({
+      container: '#graph-container',
+      simulator: { changeCount: 50, seed: 42 }
+    });
+    app.init();
+
+    // Wire up detail close button
+    document.getElementById('detail-close').addEventListener('click', function () {
+      document.getElementById('node-detail').classList.remove('visible');
+      app._renderer.clearHighlight();
+    });
+  </script>
+</body>
+</html>
