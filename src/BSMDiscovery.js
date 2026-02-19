@@ -36,6 +36,72 @@ function BSMDiscovery(options) {
 
 // ---------- Initialization ----------
 
+/**
+ * Field list for the single ServiceNow Table API query on task_ci.
+ * Dot-walked fields pull data from both the change (task.*) and CI (ci_item.*).
+ */
+BSMDiscovery.QUERY_FIELDS = {
+  task_ci: [
+    'task.number', 'task.type', 'task.risk', 'task.impact',
+    'task.u_impact_region', 'task.assignment_group', 'task.sys_created_on',
+    'ci_item.name', 'ci_item.sys_class_name', 'ci_item.u_role',
+    'ci_item.ip_address', 'ci_item.model_id', 'ci_item.sys_updated_on'
+  ]
+};
+
+/**
+ * Update the encoded query display to show the equivalent ServiceNow queries.
+ */
+BSMDiscovery.prototype._updateQueryDisplay = function () {
+  var limitEl = document.getElementById('query-limit');
+  var startEl = document.getElementById('query-start');
+  var endEl = document.getElementById('query-end');
+  var displayEl = document.getElementById('query-encoded');
+  if (!limitEl || !startEl || !endEl || !displayEl) return;
+
+  var limit = limitEl.value || 100;
+
+  var queryParts = [];
+  if (startEl.value) queryParts.push('task.sys_created_on>=' + startEl.value);
+  if (endEl.value) queryParts.push('task.sys_created_on<=' + endEl.value);
+  var query = queryParts.join('^');
+
+  var fields = BSMDiscovery.QUERY_FIELDS.task_ci;
+  var lines = [];
+  lines.push('\u2500\u2500 task_ci \u2500\u2500');
+  lines.push('sysparm_limit=' + limit);
+  lines.push('sysparm_fields=' + fields.join(','));
+  if (query) lines.push('sysparm_query=' + query);
+
+  displayEl.textContent = lines.join('\n');
+  displayEl.classList.add('visible');
+};
+
+/**
+ * Re-initialize the app with new query parameters.
+ * Reads values from the query parameter controls.
+ */
+BSMDiscovery.prototype.reInit = function () {
+  var limitEl = document.getElementById('query-limit');
+  var startEl = document.getElementById('query-start');
+  var endEl = document.getElementById('query-end');
+
+  var limit = limitEl ? parseInt(limitEl.value, 10) || 100 : 100;
+  var startDate = startEl ? startEl.value : null;
+  var endDate = endEl ? endEl.value : null;
+
+  // Merge into simulator options — aligns with SNTableAPI parameters
+  this.simulatorOptions.limit = limit;
+  this.simulatorOptions.changeCount = Math.max(limit, this.simulatorOptions.changeCount || 200);
+  if (startDate) this.simulatorOptions.startDate = startDate;
+  if (endDate) this.simulatorOptions.endDate = endDate;
+
+  this._updateQueryDisplay();
+  this._isTransposed = false;
+  this._isUpSetView = false;
+  this.init();
+};
+
 BSMDiscovery.prototype.init = function () {
   var self = this;
 
@@ -63,7 +129,11 @@ BSMDiscovery.prototype.init = function () {
     self._setLoading(true, 'Rendering visualization\u2026');
     setTimeout(function () {
       self._renderer.render(self._originalGraph);
-      self._bindControls();
+      if (!self._controlsBound) {
+        self._bindControls();
+        self._controlsBound = true;
+      }
+      self._updateViewButtons();
       self._updateLegendCounts();
       self._updateCooccurrence();
 
@@ -146,8 +216,11 @@ BSMDiscovery.prototype.init = function () {
         self._renderImpactPanel();
         self._renderIncidentsPanel();
 
-        // Bind analytics controls
-        self._bindAnalyticsControls();
+        // Bind analytics controls (only once)
+        if (!self._analyticsControlsBound) {
+          self._bindAnalyticsControls();
+          self._analyticsControlsBound = true;
+        }
 
         self._setLoading(false);
       }, 50);
@@ -262,6 +335,17 @@ BSMDiscovery.prototype._bindControls = function () {
       self._updateCooccurrence();
     });
   });
+
+  // Query parameter controls
+  var queryApplyBtn = document.getElementById('query-apply');
+  if (queryApplyBtn) {
+    queryApplyBtn.addEventListener('click', function () {
+      self.reInit();
+    });
+  }
+
+  // Show initial encoded query
+  this._updateQueryDisplay();
 
   // Click on graph background to clear highlight
   var container = document.querySelector(this.containerSelector);
@@ -447,7 +531,7 @@ BSMDiscovery.prototype._showNodeDetail = function (d) {
   }
 
   var rows = [];
-  var props = { uid: 'UID', className: 'Class', ipAddress: 'IP Address', os: 'OS', model: 'Model', role: 'Role', risk: 'Risk', region: 'Region', assignmentGroup: 'Group', businessService: 'Service' };
+  var props = { uid: 'UID', className: 'Class', ipAddress: 'IP Address', model: 'Model', role: 'Role', risk: 'Risk', impact: 'Impact', changeType: 'Type', region: 'Region', assignmentGroup: 'Group', sysUpdatedOn: 'Updated', createdAt: 'Created' };
   var keys = Object.keys(props);
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];

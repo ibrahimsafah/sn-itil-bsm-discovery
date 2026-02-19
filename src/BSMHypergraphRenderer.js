@@ -646,10 +646,11 @@ BSMHypergraphRenderer.prototype._showTooltip = function (event, d) {
   if (d.type === 'ci') {
     if (d.className) lines.push('Class: ' + d.className);
     if (d.ipAddress) lines.push('IP: ' + d.ipAddress);
-    if (d.os) lines.push('OS: ' + d.os);
+    if (d.role) lines.push('Role: ' + d.role);
   } else if (d.type === 'change') {
     if (d.risk) lines.push('Risk: ' + d.risk);
-    if (d.model) lines.push('Model: ' + d.model);
+    if (d.changeType) lines.push('Type: ' + d.changeType);
+    if (d.impact) lines.push('Impact: ' + d.impact);
     if (d.region) lines.push('Region: ' + d.region);
   }
 

@@ -215,7 +215,24 @@ async function build() {
   const scriptsStart = html.indexOf('<!-- Application Scripts -->');
   const bodyContent = html.substring(bodyStart, scriptsStart).trim();
 
-  // 4. Assemble the single-file HTML
+  // 4. App script block (shared by all variants)
+  const appScript = `
+/* ── ITILDataSimulator ── */
+${jsModules[0].source}
+/* ── HypergraphCore ── */
+${jsModules[1].source}
+/* ── BSMHypergraphRenderer ── */
+${jsModules[2].source}
+/* ── AnalyticsEngine ── */
+${jsModules[3].source}
+/* ── UpSetRenderer ── */
+${jsModules[4].source}
+/* ── BSMDiscovery ── */
+${jsModules[5].source}
+/* ── Init ── */
+${initScript}`;
+
+  // 5. Assemble the self-contained HTML (D3 inlined)
   const assembledHtml = (imageGallery) => `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -233,33 +250,38 @@ ${d3Source}
 <body>
   ${bodyContent}
 ${imageGallery}
-  <script>
-/* ── ITILDataSimulator ── */
-${jsModules[0].source}
-/* ── HypergraphCore ── */
-${jsModules[1].source}
-/* ── BSMHypergraphRenderer ── */
-${jsModules[2].source}
-/* ── AnalyticsEngine ── */
-${jsModules[3].source}
-/* ── UpSetRenderer ── */
-${jsModules[4].source}
-/* ── BSMDiscovery ── */
-${jsModules[5].source}
-/* ── Init ── */
-${initScript}
+  <script>${appScript}
   </script>
 </body>
 </html>`;
 
-  // 5. Write output — no images
+  // 6. Assemble the CDN variant (D3 loaded from CDN)
+  const cdnHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BSM Hypergraph Discovery</title>
+  <style>
+${css}
+  </style>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  ${bodyContent}
+  <script>${appScript}
+  </script>
+</body>
+</html>`;
+
+  // 7. Write output — self-contained (no images)
   const outNoImages = path.join(DIST, 'bsm-discovery.html');
   const contentNoImages = assembledHtml('');
   fs.writeFileSync(outNoImages, contentNoImages);
   console.log(`\n  ✓ ${outNoImages}`);
   console.log(`    Size: ${humanSize(Buffer.byteLength(contentNoImages))}`);
 
-  // 6. Write output — with images
+  // 8. Write output — self-contained (with images)
   console.log('\n  Embedding screenshots...');
   const gallery = buildImageGallery();
   const contentWithImages = assembledHtml(gallery);
@@ -267,6 +289,12 @@ ${initScript}
   fs.writeFileSync(outWithImages, contentWithImages);
   console.log(`  ✓ ${outWithImages}`);
   console.log(`    Size: ${humanSize(Buffer.byteLength(contentWithImages))}`);
+
+  // 9. Write output — CDN variant
+  const outCdn = path.join(DIST, 'bsm-discovery-cdn.html');
+  fs.writeFileSync(outCdn, cdnHtml);
+  console.log(`\n  ✓ ${outCdn}`);
+  console.log(`    Size: ${humanSize(Buffer.byteLength(cdnHtml))}`);
 
   console.log('\n  Build complete.\n');
 }

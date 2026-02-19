@@ -164,34 +164,40 @@ AnalyticsEngine.prototype._projectedAdjacency = function (graph) {
 };
 
 /**
- * Build a flat change list with timestamps from rawData.
- * Each entry: { number, createdAt (ms), closedAt (ms), risk, model,
- *               category, ciUids: [...], serviceUid, groupUid }
+ * Build a flat change list with timestamps from rawData.taskCiRecords.
+ * Groups flat task_ci rows by task.number into per-change entries.
+ * Each entry: { number, createdAt (ms), risk, changeType, impact,
+ *               region, assignmentGroup, ciUids: [...] }
  * @private
  */
 AnalyticsEngine.prototype._changeList = function (rawData) {
-  var changes = rawData.changes;
-  var nums = Object.keys(changes);
-  var list = [];
-  for (var i = 0; i < nums.length; i++) {
-    var chg = changes[nums[i]];
-    var ciUids = [];
-    for (var k = 0; k < chg.cis.length; k++) {
-      ciUids.push('ci:' + chg.cis[k].id);
+  var records = rawData.taskCiRecords;
+  if (!records || records.length === 0) return [];
+
+  // Group task_ci records by change number
+  var changeMap = {};
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var num = rec['task.number'];
+    if (!changeMap[num]) {
+      changeMap[num] = {
+        number: num,
+        createdAt: this._parseDate(rec['task.sys_created_on']),
+        risk: rec['task.risk'] || 'Low',
+        changeType: rec['task.type'] || 'Standard',
+        impact: rec['task.impact'] || '3 - Low',
+        region: rec['task.u_impact_region'] || '',
+        assignmentGroup: rec['task.assignment_group'] || '',
+        ciUids: []
+      };
     }
-    list.push({
-      number: chg.number,
-      createdAt: this._parseDate(chg.createdAt),
-      closedAt: this._parseDate(chg.closedAt),
-      risk: chg.risk || 'Low',
-      model: chg.model || 'Standard',
-      category: chg.category || '',
-      ciUids: ciUids,
-      serviceUid: 'service:' + chg.businessService.id,
-      groupUid: 'group:' + chg.assignmentGroup.id,
-      groupName: chg.assignmentGroup.name,
-      serviceName: chg.businessService.name
-    });
+    changeMap[num].ciUids.push('ci:' + rec['ci_item.sys_id']);
+  }
+
+  var list = [];
+  var nums = Object.keys(changeMap);
+  for (var j = 0; j < nums.length; j++) {
+    list.push(changeMap[nums[j]]);
   }
   // Sort by createdAt ascending
   list.sort(function (a, b) { return a.createdAt - b.createdAt; });
@@ -518,7 +524,7 @@ AnalyticsEngine.prototype.temporalCascades = function (graph, rawData, windowDay
   windowDays = windowDays || 7;
   var windowMs = windowDays * 24 * 60 * 60 * 1000;
 
-  if (!rawData || !rawData.changes) return [];
+  if (!rawData || !rawData.taskCiRecords) return [];
 
   var changeList = this._changeList(rawData);
 
@@ -630,7 +636,7 @@ AnalyticsEngine.prototype.temporalCascades = function (graph, rawData, windowDay
  * @returns {Object} { nodeUid: { weeks: [count,...], avg, max, trend } }
  */
 AnalyticsEngine.prototype.changeVelocity = function (rawData) {
-  if (!rawData || !rawData.changes) return {};
+  if (!rawData || !rawData.taskCiRecords) return {};
 
   var changeList = this._changeList(rawData);
   if (changeList.length === 0) return {};
@@ -737,7 +743,7 @@ AnalyticsEngine.prototype.weightedCooccurrence = function (graph, rawData, topN)
 
   if (!graph || !graph.edges || graph.edges.length === 0) return [];
 
-  var changeList = this._changeList(rawData || { changes: {} });
+  var changeList = this._changeList(rawData || { taskCiRecords: [] });
 
   // Determine "now" as max timestamp for recency calc
   var now = 0;
@@ -784,7 +790,7 @@ AnalyticsEngine.prototype.weightedCooccurrence = function (graph, rawData, topN)
     var riskW = this._riskWeight(edge.risk || 'Low');
     var age = (chgData && chgData.createdAt > 0) ? (now - chgData.createdAt) : 0;
     var recencyW = Math.exp(-ln2 * age / halfLifeMs);
-    var groupName = edge.assignmentGroup || (chgData ? chgData.groupName : '');
+    var groupName = edge.assignmentGroup || (chgData ? chgData.assignmentGroup : '');
 
     // All CI pairs in this edge
     for (var a = 0; a < ciMembers.length; a++) {
@@ -1069,7 +1075,7 @@ AnalyticsEngine.prototype.riskHeatmap = function (graph, rawData) {
     ciSet[ciUids[i]] = true;
   }
 
-  var changeList = this._changeList(rawData || { changes: {} });
+  var changeList = this._changeList(rawData || { taskCiRecords: [] });
 
   // Per-CI metrics
   var ciStats = {}; // uid -> { changeCount, emergencyCount, coupledCIs (Set) }
@@ -1080,7 +1086,7 @@ AnalyticsEngine.prototype.riskHeatmap = function (graph, rawData) {
   // Accumulate from change list
   for (i = 0; i < changeList.length; i++) {
     var chg = changeList[i];
-    var isEmergency = (chg.model === 'Emergency');
+    var isEmergency = (chg.changeType === 'Emergency');
     for (j = 0; j < chg.ciUids.length; j++) {
       var ciUid = chg.ciUids[j];
       if (!ciStats[ciUid]) continue;
@@ -1443,7 +1449,7 @@ AnalyticsEngine.prototype.predictImpact = function (graph, rawData, targetCiUid)
 
   // 2. Temporal cascades (target -> other)
   var cascades = {};
-  if (rawData && rawData.changes) {
+  if (rawData && rawData.taskCiRecords) {
     var changeList = this._changeList(rawData);
     var targetChanges = [];
     var otherChanges = {}; // ciUid -> [{time}]

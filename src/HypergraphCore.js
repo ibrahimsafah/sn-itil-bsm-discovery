@@ -21,77 +21,95 @@
 function HypergraphCore() {}
 
 /**
- * Build the original hypergraph from simulator data.
+ * Build the original hypergraph from task_ci records.
+ *
+ * Flat task_ci rows (each a change–CI pairing with dot-walked fields) are
+ * grouped by task.number to form change hyperedges, and deduplicated by
+ * ci_item.sys_id to form CI nodes.
  *
  * @param {Object} data - Output of ITILDataSimulator.generate()
+ *   data.taskCiRecords — array of flat task_ci rows
  * @returns {Object} Hypergraph descriptor { nodes, edges, incidence, stats, isTransposed }
  */
 HypergraphCore.prototype.build = function (data) {
+  var records = data.taskCiRecords;
   var nodes = [];
   var nodeMap = {};  // uid -> node object
   var edges = [];
-  var edgeMap = {};  // uid -> edge object
   var incidence = {}; // nodeUid -> Set of edgeUids
 
-  // Create entity nodes
-  var entityUids = Object.keys(data.entities);
-  for (var i = 0; i < entityUids.length; i++) {
-    var uid = entityUids[i];
-    var entity = data.entities[uid];
-    var node = {
-      uid: uid,
-      type: entity.type,
-      name: entity.name,
-      className: entity.className || null,
-      ipAddress: entity.ipAddress || null,
-      role: entity.role || null,
-      os: entity.os || null,
-      model: entity.model || null,
-      focus: entity.focus || null,
-      ciClasses: entity.ciClasses || null
-    };
-    nodes.push(node);
-    nodeMap[uid] = node;
-    incidence[uid] = new Set();
+  var i, j;
+
+  // Pass 1: Extract unique CIs as nodes
+  var ciSeen = {};
+  for (i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var ciSysId = rec['ci_item.sys_id'];
+    if (!ciSeen[ciSysId]) {
+      ciSeen[ciSysId] = true;
+      var node = {
+        uid: 'ci:' + ciSysId,
+        type: 'ci',
+        name: rec['ci_item.name'],
+        className: rec['ci_item.sys_class_name'],
+        ipAddress: rec['ci_item.ip_address'],
+        role: rec['ci_item.u_role'],
+        model: rec['ci_item.model_id'],
+        sysUpdatedOn: rec['ci_item.sys_updated_on']
+      };
+      nodes.push(node);
+      nodeMap[node.uid] = node;
+      incidence[node.uid] = new Set();
+    }
   }
 
-  // Create hyperedges from change requests
-  var changeNumbers = Object.keys(data.changes);
-  for (var c = 0; c < changeNumbers.length; c++) {
-    var chgNum = changeNumbers[c];
-    var chg = data.changes[chgNum];
-    var edgeUid = 'change:' + chgNum;
+  // Pass 2: Group records by change number to build hyperedges
+  var changeGroups = {};
+  for (j = 0; j < records.length; j++) {
+    var r = records[j];
+    var chgNum = r['task.number'];
+    if (!changeGroups[chgNum]) {
+      changeGroups[chgNum] = {
+        number: chgNum,
+        changeType: r['task.type'],
+        risk: r['task.risk'],
+        impact: r['task.impact'],
+        region: r['task.u_impact_region'],
+        assignmentGroup: r['task.assignment_group'],
+        createdAt: r['task.sys_created_on'],
+        ciUids: []
+      };
+    }
+    changeGroups[chgNum].ciUids.push('ci:' + r['ci_item.sys_id']);
+  }
 
-    // Collect member entity uids for this change
+  // Build hyperedges from grouped changes
+  var chgNums = Object.keys(changeGroups);
+  for (var e = 0; e < chgNums.length; e++) {
+    var chg = changeGroups[chgNums[e]];
+    var edgeUid = 'change:' + chg.number;
     var members = [];
-    // Add assignment group
-    var groupUid = 'group:' + chg.assignmentGroup.id;
-    if (nodeMap[groupUid]) members.push(groupUid);
-    // Add business service
-    var serviceUid = 'service:' + chg.businessService.id;
-    if (nodeMap[serviceUid]) members.push(serviceUid);
-    // Add CIs
-    for (var k = 0; k < chg.cis.length; k++) {
-      var ciUid = 'ci:' + chg.cis[k].id;
-      if (nodeMap[ciUid]) members.push(ciUid);
+
+    for (var m = 0; m < chg.ciUids.length; m++) {
+      if (nodeMap[chg.ciUids[m]]) members.push(chg.ciUids[m]);
     }
 
     var edge = {
       uid: edgeUid,
       elements: members,
       number: chg.number,
-      region: chg.region,
+      changeType: chg.changeType,
       risk: chg.risk,
-      model: chg.model,
-      assignmentGroup: chg.assignmentGroup.name,
-      businessService: chg.businessService.name
+      impact: chg.impact,
+      region: chg.region,
+      assignmentGroup: chg.assignmentGroup,
+      createdAt: chg.createdAt
     };
     edges.push(edge);
-    edgeMap[edgeUid] = edge;
 
     // Populate incidence matrix
-    for (var m = 0; m < members.length; m++) {
-      incidence[members[m]].add(edgeUid);
+    for (var mi = 0; mi < members.length; mi++) {
+      incidence[members[mi]].add(edgeUid);
     }
   }
 
@@ -128,11 +146,12 @@ HypergraphCore.prototype.transpose = function (graph) {
       uid: oldEdge.uid,
       type: 'change',
       name: oldEdge.number,
-      region: oldEdge.region,
+      changeType: oldEdge.changeType,
       risk: oldEdge.risk,
-      model: oldEdge.model,
+      impact: oldEdge.impact,
+      region: oldEdge.region,
       assignmentGroup: oldEdge.assignmentGroup,
-      businessService: oldEdge.businessService
+      createdAt: oldEdge.createdAt
     });
     newIncidence[oldEdge.uid] = new Set();
   }

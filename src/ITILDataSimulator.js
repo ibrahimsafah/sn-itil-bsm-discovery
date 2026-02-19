@@ -10,9 +10,8 @@
  * Usage:
  *   var sim = new ITILDataSimulator({ changeCount: 50, incidentCount: 30 });
  *   var data = sim.generate();
- *   // data.changes   — map of CHG number -> change record
- *   // data.entities  — map of entity uid -> entity descriptor
- *   // data.incidents — map of INC number -> incident record
+ *   // data.taskCiRecords — flat task_ci rows with dot-walked fields
+ *   // data.incidents     — map of INC number -> incident record
  */
 
 function ITILDataSimulator(options) {
@@ -21,7 +20,20 @@ function ITILDataSimulator(options) {
   this.incidentCount = options.incidentCount || 30;
   this.seed = options.seed || 42;
   this._rng = this._createRng(this.seed);
-  this.baseDate = new Date('2025-01-15T00:00:00Z');
+
+  // Date range: aligns with ServiceNow sysparm_query:
+  //   sys_created_on>=startDate^sys_created_on<=endDate
+  this.baseDate = options.startDate
+    ? new Date(options.startDate + 'T00:00:00Z')
+    : new Date('2025-01-15T00:00:00Z');
+  this.endDate = options.endDate
+    ? new Date(options.endDate + 'T23:59:59Z')
+    : new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+  // sysparm_limit: caps number of change records returned
+  if (options.limit != null) {
+    this.changeCount = Math.min(this.changeCount, options.limit);
+  }
 }
 
 // ---------- Deterministic PRNG (mulberry32) ----------
@@ -129,6 +141,7 @@ ITILDataSimulator.CI_TEMPLATES = {
 
 ITILDataSimulator.REGIONS = ['US-East', 'US-West', 'EU-West', 'EU-Central', 'APAC'];
 ITILDataSimulator.RISK_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
+ITILDataSimulator.IMPACT_LEVELS = ['1 - High', '2 - Medium', '3 - Low'];
 ITILDataSimulator.CHANGE_MODELS = ['Standard', 'Normal', 'Emergency'];
 
 /**
@@ -158,23 +171,51 @@ ITILDataSimulator.prototype.generate = function () {
   var changes = this._generateChanges(groups, services, cis);
   var incidents = this._generateIncidents(groups, services, cis, changes);
 
-  // Build entity map (keyed by uid)
-  var entities = {};
-  var i;
-  for (i = 0; i < groups.length; i++) {
-    var g = groups[i];
-    entities['group:' + g.id] = { type: 'group', id: g.id, name: g.name, focus: g.focus };
-  }
-  for (i = 0; i < services.length; i++) {
-    var s = services[i];
-    entities['service:' + s.id] = { type: 'service', id: s.id, name: s.name, ciClasses: s.ciClasses };
-  }
-  for (i = 0; i < cis.length; i++) {
-    var c = cis[i];
-    entities['ci:' + c.id] = { type: 'ci', id: c.id, name: c.name, className: c.className, ipAddress: c.ipAddress, role: c.role, os: c.os, model: c.model };
+  // Flatten changes into task_ci records (single-query model)
+  var taskCiRecords = this._flattenToTaskCi(changes);
+
+  return { taskCiRecords: taskCiRecords, incidents: incidents };
+};
+
+/**
+ * Flatten internal change records into task_ci rows with dot-walked fields.
+ *
+ * Each row represents one task_ci M2M record as returned by the ServiceNow
+ * Table API with dot-walked fields from change_request (task.*) and
+ * cmdb_ci (ci_item.*).
+ *
+ * @param {Object} changes - Internal change map keyed by CHG number
+ * @returns {Array<Object>} Flat task_ci records
+ */
+ITILDataSimulator.prototype._flattenToTaskCi = function (changes) {
+  var records = [];
+  var changeNumbers = Object.keys(changes);
+
+  for (var i = 0; i < changeNumbers.length; i++) {
+    var chg = changes[changeNumbers[i]];
+
+    for (var j = 0; j < chg.cis.length; j++) {
+      var ci = chg.cis[j];
+      records.push({
+        'task.number':            chg.number,
+        'task.type':              chg.model,
+        'task.risk':              chg.risk,
+        'task.impact':            chg.impact,
+        'task.u_impact_region':   chg.region,
+        'task.assignment_group':  chg.assignmentGroup.name,
+        'task.sys_created_on':    chg.createdAt,
+        'ci_item.sys_id':         ci.id,
+        'ci_item.name':           ci.name,
+        'ci_item.sys_class_name': ci.className,
+        'ci_item.u_role':         ci.role,
+        'ci_item.ip_address':     ci.ipAddress,
+        'ci_item.model_id':       ci.model,
+        'ci_item.sys_updated_on': ci.sysUpdatedOn
+      });
+    }
   }
 
-  return { changes: changes, entities: entities, incidents: incidents };
+  return records;
 };
 
 ITILDataSimulator.prototype._generateGroups = function () {
@@ -216,7 +257,8 @@ ITILDataSimulator.prototype._generateCIs = function () {
         ipAddress: ip,
         role: baseName.split('-')[0],
         os: this._pick(tpl.osOptions),
-        model: this._pick(tpl.models)
+        model: this._pick(tpl.models),
+        sysUpdatedOn: this._randomDate(this.baseDate, this.endDate).toISOString()
       });
     }
   }
@@ -263,7 +305,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
   var i, ci;
   var self = this;
 
-  var windowEnd = new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  var windowEnd = this.endDate;
 
   for (i = 0; i < cis.length; i++) {
     ci = cis[i];
@@ -310,6 +352,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
       number: number,
       region: this._pick(ITILDataSimulator.REGIONS),
       risk: this._pick(ITILDataSimulator.RISK_LEVELS),
+      impact: this._pick(ITILDataSimulator.IMPACT_LEVELS),
       model: model,
       category: category,
       assignmentGroup: { id: group.id, name: group.name },
@@ -317,7 +360,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
       createdAt: createdAt.toISOString(),
       closedAt: closedAt.toISOString(),
       cis: selectedCIs.map(function (ci) {
-        return { id: ci.id, name: ci.name, className: ci.className, ipAddress: ci.ipAddress, role: ci.role, os: ci.os, model: ci.model };
+        return { id: ci.id, name: ci.name, className: ci.className, ipAddress: ci.ipAddress, role: ci.role, os: ci.os, model: ci.model, sysUpdatedOn: ci.sysUpdatedOn };
       })
     };
   }
@@ -336,7 +379,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
 ITILDataSimulator.prototype._generateIncidents = function (groups, services, cis, changes) {
   var incidents = {};
   var self = this;
-  var windowEnd = new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  var windowEnd = this.endDate;
 
   // Build a map of CI id -> list of other CI ids that share at least one change
   var ciNeighbors = {};

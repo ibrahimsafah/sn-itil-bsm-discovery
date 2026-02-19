@@ -82,6 +82,87 @@ body {
   margin-bottom: 10px;
 }
 
+/* Query Parameters */
+.query-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.query-param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.query-param-row label {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.query-input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.query-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.query-input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
+.query-apply-btn {
+  margin-top: 4px;
+  padding: 7px 0;
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.query-apply-btn:hover {
+  opacity: 0.85;
+}
+
+.query-apply-btn:active {
+  opacity: 0.7;
+}
+
+.query-encoded {
+  font-size: 9px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--text-muted);
+  word-break: break-all;
+  line-height: 1.5;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  display: none;
+}
+
+.query-encoded.visible {
+  display: block;
+}
+
 /* Stats Panel */
 .stats-grid {
   display: grid;
@@ -1373,6 +1454,27 @@ input[type="range"]::-webkit-slider-thumb {
         <div class="subtitle">ITIL Hypergraph Explorer</div>
       </div>
 
+      <!-- Query Parameters -->
+      <div class="sidebar-section">
+        <h3>Query Parameters</h3>
+        <div class="query-params">
+          <div class="query-param-row">
+            <label for="query-limit">sysparm_limit</label>
+            <input type="number" id="query-limit" class="query-input" value="100" min="10" max="500" step="10">
+          </div>
+          <div class="query-param-row">
+            <label for="query-start">sys_created_on &gt;=</label>
+            <input type="date" id="query-start" class="query-input" value="2025-01-15">
+          </div>
+          <div class="query-param-row">
+            <label for="query-end">sys_created_on &lt;=</label>
+            <input type="date" id="query-end" class="query-input" value="2025-04-15">
+          </div>
+          <button id="query-apply" class="query-apply-btn">Apply Query</button>
+          <div class="query-encoded" id="query-encoded"></div>
+        </div>
+      </div>
+
       <!-- View Toggle -->
       <div class="sidebar-section">
         <h3>Perspective</h3>
@@ -1644,9 +1746,8 @@ input[type="range"]::-webkit-slider-thumb {
  * Usage:
  *   var sim = new ITILDataSimulator({ changeCount: 50, incidentCount: 30 });
  *   var data = sim.generate();
- *   // data.changes   — map of CHG number -> change record
- *   // data.entities  — map of entity uid -> entity descriptor
- *   // data.incidents — map of INC number -> incident record
+ *   // data.taskCiRecords — flat task_ci rows with dot-walked fields
+ *   // data.incidents     — map of INC number -> incident record
  */
 
 function ITILDataSimulator(options) {
@@ -1655,7 +1756,20 @@ function ITILDataSimulator(options) {
   this.incidentCount = options.incidentCount || 30;
   this.seed = options.seed || 42;
   this._rng = this._createRng(this.seed);
-  this.baseDate = new Date('2025-01-15T00:00:00Z');
+
+  // Date range: aligns with ServiceNow sysparm_query:
+  //   sys_created_on>=startDate^sys_created_on<=endDate
+  this.baseDate = options.startDate
+    ? new Date(options.startDate + 'T00:00:00Z')
+    : new Date('2025-01-15T00:00:00Z');
+  this.endDate = options.endDate
+    ? new Date(options.endDate + 'T23:59:59Z')
+    : new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+  // sysparm_limit: caps number of change records returned
+  if (options.limit != null) {
+    this.changeCount = Math.min(this.changeCount, options.limit);
+  }
 }
 
 // ---------- Deterministic PRNG (mulberry32) ----------
@@ -1763,6 +1877,7 @@ ITILDataSimulator.CI_TEMPLATES = {
 
 ITILDataSimulator.REGIONS = ['US-East', 'US-West', 'EU-West', 'EU-Central', 'APAC'];
 ITILDataSimulator.RISK_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
+ITILDataSimulator.IMPACT_LEVELS = ['1 - High', '2 - Medium', '3 - Low'];
 ITILDataSimulator.CHANGE_MODELS = ['Standard', 'Normal', 'Emergency'];
 
 /**
@@ -1792,23 +1907,51 @@ ITILDataSimulator.prototype.generate = function () {
   var changes = this._generateChanges(groups, services, cis);
   var incidents = this._generateIncidents(groups, services, cis, changes);
 
-  // Build entity map (keyed by uid)
-  var entities = {};
-  var i;
-  for (i = 0; i < groups.length; i++) {
-    var g = groups[i];
-    entities['group:' + g.id] = { type: 'group', id: g.id, name: g.name, focus: g.focus };
-  }
-  for (i = 0; i < services.length; i++) {
-    var s = services[i];
-    entities['service:' + s.id] = { type: 'service', id: s.id, name: s.name, ciClasses: s.ciClasses };
-  }
-  for (i = 0; i < cis.length; i++) {
-    var c = cis[i];
-    entities['ci:' + c.id] = { type: 'ci', id: c.id, name: c.name, className: c.className, ipAddress: c.ipAddress, role: c.role, os: c.os, model: c.model };
+  // Flatten changes into task_ci records (single-query model)
+  var taskCiRecords = this._flattenToTaskCi(changes);
+
+  return { taskCiRecords: taskCiRecords, incidents: incidents };
+};
+
+/**
+ * Flatten internal change records into task_ci rows with dot-walked fields.
+ *
+ * Each row represents one task_ci M2M record as returned by the ServiceNow
+ * Table API with dot-walked fields from change_request (task.*) and
+ * cmdb_ci (ci_item.*).
+ *
+ * @param {Object} changes - Internal change map keyed by CHG number
+ * @returns {Array<Object>} Flat task_ci records
+ */
+ITILDataSimulator.prototype._flattenToTaskCi = function (changes) {
+  var records = [];
+  var changeNumbers = Object.keys(changes);
+
+  for (var i = 0; i < changeNumbers.length; i++) {
+    var chg = changes[changeNumbers[i]];
+
+    for (var j = 0; j < chg.cis.length; j++) {
+      var ci = chg.cis[j];
+      records.push({
+        'task.number':            chg.number,
+        'task.type':              chg.model,
+        'task.risk':              chg.risk,
+        'task.impact':            chg.impact,
+        'task.u_impact_region':   chg.region,
+        'task.assignment_group':  chg.assignmentGroup.name,
+        'task.sys_created_on':    chg.createdAt,
+        'ci_item.sys_id':         ci.id,
+        'ci_item.name':           ci.name,
+        'ci_item.sys_class_name': ci.className,
+        'ci_item.u_role':         ci.role,
+        'ci_item.ip_address':     ci.ipAddress,
+        'ci_item.model_id':       ci.model,
+        'ci_item.sys_updated_on': ci.sysUpdatedOn
+      });
+    }
   }
 
-  return { changes: changes, entities: entities, incidents: incidents };
+  return records;
 };
 
 ITILDataSimulator.prototype._generateGroups = function () {
@@ -1850,7 +1993,8 @@ ITILDataSimulator.prototype._generateCIs = function () {
         ipAddress: ip,
         role: baseName.split('-')[0],
         os: this._pick(tpl.osOptions),
-        model: this._pick(tpl.models)
+        model: this._pick(tpl.models),
+        sysUpdatedOn: this._randomDate(this.baseDate, this.endDate).toISOString()
       });
     }
   }
@@ -1897,7 +2041,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
   var i, ci;
   var self = this;
 
-  var windowEnd = new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  var windowEnd = this.endDate;
 
   for (i = 0; i < cis.length; i++) {
     ci = cis[i];
@@ -1944,6 +2088,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
       number: number,
       region: this._pick(ITILDataSimulator.REGIONS),
       risk: this._pick(ITILDataSimulator.RISK_LEVELS),
+      impact: this._pick(ITILDataSimulator.IMPACT_LEVELS),
       model: model,
       category: category,
       assignmentGroup: { id: group.id, name: group.name },
@@ -1951,7 +2096,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
       createdAt: createdAt.toISOString(),
       closedAt: closedAt.toISOString(),
       cis: selectedCIs.map(function (ci) {
-        return { id: ci.id, name: ci.name, className: ci.className, ipAddress: ci.ipAddress, role: ci.role, os: ci.os, model: ci.model };
+        return { id: ci.id, name: ci.name, className: ci.className, ipAddress: ci.ipAddress, role: ci.role, os: ci.os, model: ci.model, sysUpdatedOn: ci.sysUpdatedOn };
       })
     };
   }
@@ -1970,7 +2115,7 @@ ITILDataSimulator.prototype._generateChanges = function (groups, services, cis) 
 ITILDataSimulator.prototype._generateIncidents = function (groups, services, cis, changes) {
   var incidents = {};
   var self = this;
-  var windowEnd = new Date(this.baseDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  var windowEnd = this.endDate;
 
   // Build a map of CI id -> list of other CI ids that share at least one change
   var ciNeighbors = {};
@@ -2186,77 +2331,95 @@ ITILDataSimulator.prototype._generateIncidents = function (groups, services, cis
 function HypergraphCore() {}
 
 /**
- * Build the original hypergraph from simulator data.
+ * Build the original hypergraph from task_ci records.
+ *
+ * Flat task_ci rows (each a change–CI pairing with dot-walked fields) are
+ * grouped by task.number to form change hyperedges, and deduplicated by
+ * ci_item.sys_id to form CI nodes.
  *
  * @param {Object} data - Output of ITILDataSimulator.generate()
+ *   data.taskCiRecords — array of flat task_ci rows
  * @returns {Object} Hypergraph descriptor { nodes, edges, incidence, stats, isTransposed }
  */
 HypergraphCore.prototype.build = function (data) {
+  var records = data.taskCiRecords;
   var nodes = [];
   var nodeMap = {};  // uid -> node object
   var edges = [];
-  var edgeMap = {};  // uid -> edge object
   var incidence = {}; // nodeUid -> Set of edgeUids
 
-  // Create entity nodes
-  var entityUids = Object.keys(data.entities);
-  for (var i = 0; i < entityUids.length; i++) {
-    var uid = entityUids[i];
-    var entity = data.entities[uid];
-    var node = {
-      uid: uid,
-      type: entity.type,
-      name: entity.name,
-      className: entity.className || null,
-      ipAddress: entity.ipAddress || null,
-      role: entity.role || null,
-      os: entity.os || null,
-      model: entity.model || null,
-      focus: entity.focus || null,
-      ciClasses: entity.ciClasses || null
-    };
-    nodes.push(node);
-    nodeMap[uid] = node;
-    incidence[uid] = new Set();
+  var i, j;
+
+  // Pass 1: Extract unique CIs as nodes
+  var ciSeen = {};
+  for (i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var ciSysId = rec['ci_item.sys_id'];
+    if (!ciSeen[ciSysId]) {
+      ciSeen[ciSysId] = true;
+      var node = {
+        uid: 'ci:' + ciSysId,
+        type: 'ci',
+        name: rec['ci_item.name'],
+        className: rec['ci_item.sys_class_name'],
+        ipAddress: rec['ci_item.ip_address'],
+        role: rec['ci_item.u_role'],
+        model: rec['ci_item.model_id'],
+        sysUpdatedOn: rec['ci_item.sys_updated_on']
+      };
+      nodes.push(node);
+      nodeMap[node.uid] = node;
+      incidence[node.uid] = new Set();
+    }
   }
 
-  // Create hyperedges from change requests
-  var changeNumbers = Object.keys(data.changes);
-  for (var c = 0; c < changeNumbers.length; c++) {
-    var chgNum = changeNumbers[c];
-    var chg = data.changes[chgNum];
-    var edgeUid = 'change:' + chgNum;
+  // Pass 2: Group records by change number to build hyperedges
+  var changeGroups = {};
+  for (j = 0; j < records.length; j++) {
+    var r = records[j];
+    var chgNum = r['task.number'];
+    if (!changeGroups[chgNum]) {
+      changeGroups[chgNum] = {
+        number: chgNum,
+        changeType: r['task.type'],
+        risk: r['task.risk'],
+        impact: r['task.impact'],
+        region: r['task.u_impact_region'],
+        assignmentGroup: r['task.assignment_group'],
+        createdAt: r['task.sys_created_on'],
+        ciUids: []
+      };
+    }
+    changeGroups[chgNum].ciUids.push('ci:' + r['ci_item.sys_id']);
+  }
 
-    // Collect member entity uids for this change
+  // Build hyperedges from grouped changes
+  var chgNums = Object.keys(changeGroups);
+  for (var e = 0; e < chgNums.length; e++) {
+    var chg = changeGroups[chgNums[e]];
+    var edgeUid = 'change:' + chg.number;
     var members = [];
-    // Add assignment group
-    var groupUid = 'group:' + chg.assignmentGroup.id;
-    if (nodeMap[groupUid]) members.push(groupUid);
-    // Add business service
-    var serviceUid = 'service:' + chg.businessService.id;
-    if (nodeMap[serviceUid]) members.push(serviceUid);
-    // Add CIs
-    for (var k = 0; k < chg.cis.length; k++) {
-      var ciUid = 'ci:' + chg.cis[k].id;
-      if (nodeMap[ciUid]) members.push(ciUid);
+
+    for (var m = 0; m < chg.ciUids.length; m++) {
+      if (nodeMap[chg.ciUids[m]]) members.push(chg.ciUids[m]);
     }
 
     var edge = {
       uid: edgeUid,
       elements: members,
       number: chg.number,
-      region: chg.region,
+      changeType: chg.changeType,
       risk: chg.risk,
-      model: chg.model,
-      assignmentGroup: chg.assignmentGroup.name,
-      businessService: chg.businessService.name
+      impact: chg.impact,
+      region: chg.region,
+      assignmentGroup: chg.assignmentGroup,
+      createdAt: chg.createdAt
     };
     edges.push(edge);
-    edgeMap[edgeUid] = edge;
 
     // Populate incidence matrix
-    for (var m = 0; m < members.length; m++) {
-      incidence[members[m]].add(edgeUid);
+    for (var mi = 0; mi < members.length; mi++) {
+      incidence[members[mi]].add(edgeUid);
     }
   }
 
@@ -2293,11 +2456,12 @@ HypergraphCore.prototype.transpose = function (graph) {
       uid: oldEdge.uid,
       type: 'change',
       name: oldEdge.number,
-      region: oldEdge.region,
+      changeType: oldEdge.changeType,
       risk: oldEdge.risk,
-      model: oldEdge.model,
+      impact: oldEdge.impact,
+      region: oldEdge.region,
       assignmentGroup: oldEdge.assignmentGroup,
-      businessService: oldEdge.businessService
+      createdAt: oldEdge.createdAt
     });
     newIncidence[oldEdge.uid] = new Set();
   }
@@ -3118,10 +3282,11 @@ BSMHypergraphRenderer.prototype._showTooltip = function (event, d) {
   if (d.type === 'ci') {
     if (d.className) lines.push('Class: ' + d.className);
     if (d.ipAddress) lines.push('IP: ' + d.ipAddress);
-    if (d.os) lines.push('OS: ' + d.os);
+    if (d.role) lines.push('Role: ' + d.role);
   } else if (d.type === 'change') {
     if (d.risk) lines.push('Risk: ' + d.risk);
-    if (d.model) lines.push('Model: ' + d.model);
+    if (d.changeType) lines.push('Type: ' + d.changeType);
+    if (d.impact) lines.push('Impact: ' + d.impact);
     if (d.region) lines.push('Region: ' + d.region);
   }
 
@@ -3389,34 +3554,40 @@ AnalyticsEngine.prototype._projectedAdjacency = function (graph) {
 };
 
 /**
- * Build a flat change list with timestamps from rawData.
- * Each entry: { number, createdAt (ms), closedAt (ms), risk, model,
- *               category, ciUids: [...], serviceUid, groupUid }
+ * Build a flat change list with timestamps from rawData.taskCiRecords.
+ * Groups flat task_ci rows by task.number into per-change entries.
+ * Each entry: { number, createdAt (ms), risk, changeType, impact,
+ *               region, assignmentGroup, ciUids: [...] }
  * @private
  */
 AnalyticsEngine.prototype._changeList = function (rawData) {
-  var changes = rawData.changes;
-  var nums = Object.keys(changes);
-  var list = [];
-  for (var i = 0; i < nums.length; i++) {
-    var chg = changes[nums[i]];
-    var ciUids = [];
-    for (var k = 0; k < chg.cis.length; k++) {
-      ciUids.push('ci:' + chg.cis[k].id);
+  var records = rawData.taskCiRecords;
+  if (!records || records.length === 0) return [];
+
+  // Group task_ci records by change number
+  var changeMap = {};
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var num = rec['task.number'];
+    if (!changeMap[num]) {
+      changeMap[num] = {
+        number: num,
+        createdAt: this._parseDate(rec['task.sys_created_on']),
+        risk: rec['task.risk'] || 'Low',
+        changeType: rec['task.type'] || 'Standard',
+        impact: rec['task.impact'] || '3 - Low',
+        region: rec['task.u_impact_region'] || '',
+        assignmentGroup: rec['task.assignment_group'] || '',
+        ciUids: []
+      };
     }
-    list.push({
-      number: chg.number,
-      createdAt: this._parseDate(chg.createdAt),
-      closedAt: this._parseDate(chg.closedAt),
-      risk: chg.risk || 'Low',
-      model: chg.model || 'Standard',
-      category: chg.category || '',
-      ciUids: ciUids,
-      serviceUid: 'service:' + chg.businessService.id,
-      groupUid: 'group:' + chg.assignmentGroup.id,
-      groupName: chg.assignmentGroup.name,
-      serviceName: chg.businessService.name
-    });
+    changeMap[num].ciUids.push('ci:' + rec['ci_item.sys_id']);
+  }
+
+  var list = [];
+  var nums = Object.keys(changeMap);
+  for (var j = 0; j < nums.length; j++) {
+    list.push(changeMap[nums[j]]);
   }
   // Sort by createdAt ascending
   list.sort(function (a, b) { return a.createdAt - b.createdAt; });
@@ -3743,7 +3914,7 @@ AnalyticsEngine.prototype.temporalCascades = function (graph, rawData, windowDay
   windowDays = windowDays || 7;
   var windowMs = windowDays * 24 * 60 * 60 * 1000;
 
-  if (!rawData || !rawData.changes) return [];
+  if (!rawData || !rawData.taskCiRecords) return [];
 
   var changeList = this._changeList(rawData);
 
@@ -3855,7 +4026,7 @@ AnalyticsEngine.prototype.temporalCascades = function (graph, rawData, windowDay
  * @returns {Object} { nodeUid: { weeks: [count,...], avg, max, trend } }
  */
 AnalyticsEngine.prototype.changeVelocity = function (rawData) {
-  if (!rawData || !rawData.changes) return {};
+  if (!rawData || !rawData.taskCiRecords) return {};
 
   var changeList = this._changeList(rawData);
   if (changeList.length === 0) return {};
@@ -3962,7 +4133,7 @@ AnalyticsEngine.prototype.weightedCooccurrence = function (graph, rawData, topN)
 
   if (!graph || !graph.edges || graph.edges.length === 0) return [];
 
-  var changeList = this._changeList(rawData || { changes: {} });
+  var changeList = this._changeList(rawData || { taskCiRecords: [] });
 
   // Determine "now" as max timestamp for recency calc
   var now = 0;
@@ -4009,7 +4180,7 @@ AnalyticsEngine.prototype.weightedCooccurrence = function (graph, rawData, topN)
     var riskW = this._riskWeight(edge.risk || 'Low');
     var age = (chgData && chgData.createdAt > 0) ? (now - chgData.createdAt) : 0;
     var recencyW = Math.exp(-ln2 * age / halfLifeMs);
-    var groupName = edge.assignmentGroup || (chgData ? chgData.groupName : '');
+    var groupName = edge.assignmentGroup || (chgData ? chgData.assignmentGroup : '');
 
     // All CI pairs in this edge
     for (var a = 0; a < ciMembers.length; a++) {
@@ -4294,7 +4465,7 @@ AnalyticsEngine.prototype.riskHeatmap = function (graph, rawData) {
     ciSet[ciUids[i]] = true;
   }
 
-  var changeList = this._changeList(rawData || { changes: {} });
+  var changeList = this._changeList(rawData || { taskCiRecords: [] });
 
   // Per-CI metrics
   var ciStats = {}; // uid -> { changeCount, emergencyCount, coupledCIs (Set) }
@@ -4305,7 +4476,7 @@ AnalyticsEngine.prototype.riskHeatmap = function (graph, rawData) {
   // Accumulate from change list
   for (i = 0; i < changeList.length; i++) {
     var chg = changeList[i];
-    var isEmergency = (chg.model === 'Emergency');
+    var isEmergency = (chg.changeType === 'Emergency');
     for (j = 0; j < chg.ciUids.length; j++) {
       var ciUid = chg.ciUids[j];
       if (!ciStats[ciUid]) continue;
@@ -4668,7 +4839,7 @@ AnalyticsEngine.prototype.predictImpact = function (graph, rawData, targetCiUid)
 
   // 2. Temporal cascades (target -> other)
   var cascades = {};
-  if (rawData && rawData.changes) {
+  if (rawData && rawData.taskCiRecords) {
     var changeList = this._changeList(rawData);
     var targetChanges = [];
     var otherChanges = {}; // ciUid -> [{time}]
@@ -5808,6 +5979,72 @@ function BSMDiscovery(options) {
 
 // ---------- Initialization ----------
 
+/**
+ * Field list for the single ServiceNow Table API query on task_ci.
+ * Dot-walked fields pull data from both the change (task.*) and CI (ci_item.*).
+ */
+BSMDiscovery.QUERY_FIELDS = {
+  task_ci: [
+    'task.number', 'task.type', 'task.risk', 'task.impact',
+    'task.u_impact_region', 'task.assignment_group', 'task.sys_created_on',
+    'ci_item.name', 'ci_item.sys_class_name', 'ci_item.u_role',
+    'ci_item.ip_address', 'ci_item.model_id', 'ci_item.sys_updated_on'
+  ]
+};
+
+/**
+ * Update the encoded query display to show the equivalent ServiceNow queries.
+ */
+BSMDiscovery.prototype._updateQueryDisplay = function () {
+  var limitEl = document.getElementById('query-limit');
+  var startEl = document.getElementById('query-start');
+  var endEl = document.getElementById('query-end');
+  var displayEl = document.getElementById('query-encoded');
+  if (!limitEl || !startEl || !endEl || !displayEl) return;
+
+  var limit = limitEl.value || 100;
+
+  var queryParts = [];
+  if (startEl.value) queryParts.push('task.sys_created_on>=' + startEl.value);
+  if (endEl.value) queryParts.push('task.sys_created_on<=' + endEl.value);
+  var query = queryParts.join('^');
+
+  var fields = BSMDiscovery.QUERY_FIELDS.task_ci;
+  var lines = [];
+  lines.push('\u2500\u2500 task_ci \u2500\u2500');
+  lines.push('sysparm_limit=' + limit);
+  lines.push('sysparm_fields=' + fields.join(','));
+  if (query) lines.push('sysparm_query=' + query);
+
+  displayEl.textContent = lines.join('\n');
+  displayEl.classList.add('visible');
+};
+
+/**
+ * Re-initialize the app with new query parameters.
+ * Reads values from the query parameter controls.
+ */
+BSMDiscovery.prototype.reInit = function () {
+  var limitEl = document.getElementById('query-limit');
+  var startEl = document.getElementById('query-start');
+  var endEl = document.getElementById('query-end');
+
+  var limit = limitEl ? parseInt(limitEl.value, 10) || 100 : 100;
+  var startDate = startEl ? startEl.value : null;
+  var endDate = endEl ? endEl.value : null;
+
+  // Merge into simulator options — aligns with SNTableAPI parameters
+  this.simulatorOptions.limit = limit;
+  this.simulatorOptions.changeCount = Math.max(limit, this.simulatorOptions.changeCount || 200);
+  if (startDate) this.simulatorOptions.startDate = startDate;
+  if (endDate) this.simulatorOptions.endDate = endDate;
+
+  this._updateQueryDisplay();
+  this._isTransposed = false;
+  this._isUpSetView = false;
+  this.init();
+};
+
 BSMDiscovery.prototype.init = function () {
   var self = this;
 
@@ -5835,7 +6072,11 @@ BSMDiscovery.prototype.init = function () {
     self._setLoading(true, 'Rendering visualization\u2026');
     setTimeout(function () {
       self._renderer.render(self._originalGraph);
-      self._bindControls();
+      if (!self._controlsBound) {
+        self._bindControls();
+        self._controlsBound = true;
+      }
+      self._updateViewButtons();
       self._updateLegendCounts();
       self._updateCooccurrence();
 
@@ -5918,8 +6159,11 @@ BSMDiscovery.prototype.init = function () {
         self._renderImpactPanel();
         self._renderIncidentsPanel();
 
-        // Bind analytics controls
-        self._bindAnalyticsControls();
+        // Bind analytics controls (only once)
+        if (!self._analyticsControlsBound) {
+          self._bindAnalyticsControls();
+          self._analyticsControlsBound = true;
+        }
 
         self._setLoading(false);
       }, 50);
@@ -6034,6 +6278,17 @@ BSMDiscovery.prototype._bindControls = function () {
       self._updateCooccurrence();
     });
   });
+
+  // Query parameter controls
+  var queryApplyBtn = document.getElementById('query-apply');
+  if (queryApplyBtn) {
+    queryApplyBtn.addEventListener('click', function () {
+      self.reInit();
+    });
+  }
+
+  // Show initial encoded query
+  this._updateQueryDisplay();
 
   // Click on graph background to clear highlight
   var container = document.querySelector(this.containerSelector);
@@ -6219,7 +6474,7 @@ BSMDiscovery.prototype._showNodeDetail = function (d) {
   }
 
   var rows = [];
-  var props = { uid: 'UID', className: 'Class', ipAddress: 'IP Address', os: 'OS', model: 'Model', role: 'Role', risk: 'Risk', region: 'Region', assignmentGroup: 'Group', businessService: 'Service' };
+  var props = { uid: 'UID', className: 'Class', ipAddress: 'IP Address', model: 'Model', role: 'Role', risk: 'Risk', impact: 'Impact', changeType: 'Type', region: 'Region', assignmentGroup: 'Group', sysUpdatedOn: 'Updated', createdAt: 'Created' };
   var keys = Object.keys(props);
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
@@ -7121,7 +7376,7 @@ BSMDiscovery.prototype._setText = function (id, value) {
 /* ── Init ── */
 var app = new BSMDiscovery({
       container: '#graph-container',
-      simulator: { changeCount: 50, seed: 42 }
+      simulator: { changeCount: 200, incidentCount: 80, seed: 42, limit: 100 }
     });
     app.init();
 
