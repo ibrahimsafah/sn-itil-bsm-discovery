@@ -80,6 +80,23 @@ body {
   margin-bottom: 10px;
 }
 
+.sidebar-section.collapsed h3 {
+  margin-bottom: 0;
+}
+
+.sidebar-section.collapsed > *:not(h3) {
+  display: none !important;
+}
+
+.collapse-icon {
+  font-size: 8px;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-section.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
 /* Query Parameters */
 .query-params {
   display: flex;
@@ -1803,32 +1820,6 @@ input[type="range"]::-webkit-slider-thumb {
         <input type="text" id="search-input" class="search-input" placeholder="Filter nodes by name…" />
       </div>
 
-      <!-- Legend -->
-      <div class="sidebar-section">
-        <h3>Legend</h3>
-        <div class="legend-list">
-          <div class="legend-item" data-type="ci">
-            <div class="legend-dot" style="background: var(--accent-blue);"></div>
-            <span class="legend-label">Configuration Items</span>
-            <span class="legend-count" data-type="ci">0</span>
-          </div>
-          <div class="legend-item" data-type="group">
-            <div class="legend-dot" style="background: var(--accent-orange);"></div>
-            <span class="legend-label">Support Groups</span>
-            <span class="legend-count" data-type="group">0</span>
-          </div>
-          <div class="legend-item" data-type="service">
-            <div class="legend-dot" style="background: var(--accent-green);"></div>
-            <span class="legend-label">Business Services</span>
-            <span class="legend-count" data-type="service">0</span>
-          </div>
-          <div class="legend-item" data-type="change">
-            <div class="legend-dot" style="background: var(--accent-purple);"></div>
-            <span class="legend-label">Change Requests</span>
-            <span class="legend-count" data-type="change">0</span>
-          </div>
-        </div>
-      </div>
 
       <!-- Hull Toggle -->
       <div class="sidebar-section" id="hull-section">
@@ -1928,7 +1919,8 @@ input[type="range"]::-webkit-slider-thumb {
         <div class="analytics-tab-content active" id="tab-centrality">
           <div class="analytics-sub-section">
             <h4>Critical Nodes</h4>
-            <div class="analytics-description">Nodes ranked by composite centrality score (degree + betweenness + eigenvector)</div>
+            <div class="analytics-description">Nodes ranked by composite centrality score (degree + betweenness +
+              eigenvector)</div>
             <div class="centrality-metric-toggle">
               <button class="metric-btn active" data-metric="composite">Composite</button>
               <button class="metric-btn" data-metric="degree">Degree</button>
@@ -1943,7 +1935,8 @@ input[type="range"]::-webkit-slider-thumb {
         <div class="analytics-tab-content" id="tab-temporal">
           <div class="analytics-sub-section">
             <h4>Change Cascades</h4>
-            <div class="analytics-description">CI pairs where changes to one frequently trigger changes to another within 7 days</div>
+            <div class="analytics-description">CI pairs where changes to one frequently trigger changes to another
+              within 7 days</div>
             <div id="cascade-list"></div>
           </div>
           <div class="analytics-sub-section">
@@ -1967,7 +1960,8 @@ input[type="range"]::-webkit-slider-thumb {
           </div>
           <div class="analytics-sub-section">
             <h4>Orphan CIs</h4>
-            <div class="analytics-description">CIs rarely or never appearing in changes — blind spots in change management</div>
+            <div class="analytics-description">CIs rarely or never appearing in changes — blind spots in change
+              management</div>
             <div id="orphan-list"></div>
           </div>
           <div class="analytics-sub-section">
@@ -2002,7 +1996,8 @@ input[type="range"]::-webkit-slider-thumb {
           </div>
           <div class="analytics-sub-section">
             <h4>Predicted Links</h4>
-            <div class="analytics-description">CI pairs likely to appear together in future changes (Adamic-Adar index)</div>
+            <div class="analytics-description">CI pairs likely to appear together in future changes (Adamic-Adar index)
+            </div>
             <div id="predicted-links"></div>
           </div>
         </div>

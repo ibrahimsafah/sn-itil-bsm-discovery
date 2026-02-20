@@ -4997,13 +4997,27 @@ BSMDiscovery.prototype._bindControls = function () {
     });
   }
 
-  // Legend toggles
-  var legendItems = document.querySelectorAll('.legend-item');
-  legendItems.forEach(function (item) {
-    item.addEventListener('click', function () {
-      var type = item.getAttribute('data-type');
-      self._renderer.toggleType(type);
-      item.classList.toggle('hidden', !self._renderer.isTypeVisible(type));
+  // Make sidebar sections collapsible
+  var sidebarHeaders = document.querySelectorAll('.sidebar-section h3');
+  sidebarHeaders.forEach(function (header) {
+    if (header.parentElement.id === 'node-detail') return;
+
+    // Add collapse icon
+    var span = document.createElement('span');
+    span.className = 'collapse-icon';
+    span.innerHTML = '&#9660;'; // down arrow
+
+    // Wrap header content if needed, but we can just append
+    header.style.cursor = 'pointer';
+    header.style.userSelect = 'none';
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.appendChild(span);
+
+    header.addEventListener('click', function () {
+      var section = header.parentElement;
+      section.classList.toggle('collapsed');
     });
   });
 
@@ -5129,26 +5143,10 @@ BSMDiscovery.prototype._updateStats = function (stats, isTransposed) {
   }
 };
 
-// ---------- Legend Counts ----------
+// ---------- Legend Counts (Removed) ----------
 
 BSMDiscovery.prototype._updateLegendCounts = function () {
-  var graph = this._isTransposed ? this._transposedGraph : this._originalGraph;
-  var counts = {};
-  for (var i = 0; i < graph.nodes.length; i++) {
-    var t = graph.nodes[i].type;
-    counts[t] = (counts[t] || 0) + 1;
-  }
-  // Also count edge types for transposed view
-  for (var j = 0; j < graph.edges.length; j++) {
-    var et = graph.edges[j].type;
-    if (et) counts[et] = (counts[et] || 0) + 1;
-  }
-
-  var countEls = document.querySelectorAll('.legend-count');
-  countEls.forEach(function (el) {
-    var type = el.getAttribute('data-type');
-    el.textContent = counts[type] || 0;
-  });
+  // Legend was removed, method preserved to prevent errors in existing calls.
 };
 
 // ---------- Node Detail Panel ----------
