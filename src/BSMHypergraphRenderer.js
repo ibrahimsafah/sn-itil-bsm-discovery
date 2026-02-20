@@ -40,7 +40,6 @@ function BSMHypergraphRenderer(containerSelector, options) {
   this._nodeById = null;
   this._maxLinkWeight = 1;
   this._visualStylePreset = 'soft-region';
-  this._visualStyle = this._resolveVisualStyle(this._visualStylePreset);
 
   this._visualStylePresets = {
     'soft-region': {
@@ -178,6 +177,8 @@ function BSMHypergraphRenderer(containerSelector, options) {
       }
     }
   };
+
+  this._visualStyle = this._resolveVisualStyle(this._visualStylePreset);
 }
 
 BSMHypergraphRenderer.prototype._resolveVisualStyle = function (presetName) {
