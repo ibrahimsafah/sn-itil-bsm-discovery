@@ -41,7 +41,7 @@ curl http://127.0.0.1:3000/api/sample-graph
 
 Then open:
 
-- `http://127.0.0.1:3000/bsm-discovery.html`
+- `http://127.0.0.1:3000/`
 
 ## Notes
 

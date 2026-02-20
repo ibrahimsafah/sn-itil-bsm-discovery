@@ -42,6 +42,11 @@ class BackendHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
 
+        if parsed.path == '/':
+            # Serve the main page at the root path.
+            self.path = '/bsm-discovery.html'
+            return super().do_GET()
+
         if parsed.path == '/api/health':
             self._send_json(HTTPStatus.OK, {
                 'status': 'ok',
