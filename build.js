@@ -191,6 +191,7 @@ async function build() {
   const css = readSrc('bsm-discovery.css');
   const jsFiles = [
     // Core
+    'SNTableAPI.js',
     'ITILDataSimulator.js',
     'HypergraphCore.js',
     'BSMHypergraphRenderer.js',
@@ -230,12 +231,19 @@ async function build() {
   const scriptsStart = html.indexOf('<!-- Application Scripts -->');
   const bodyContent = html.substring(bodyStart, scriptsStart).trim();
 
-  // 4. App script block (shared by all variants)
+  // Assemble the app script block
   const appScript = jsModules.map((mod) =>
     `/* ── ${mod.name} ── */\n${mod.source}`
   ).join('\n') + `\n/* ── Init ── */\n${initScript}`;
 
-  // 5. Assemble the self-contained HTML (D3 inlined)
+  // Write out the external JavaScript bundle
+  const bundleFileName = 'bsm-discovery.bundle.js';
+  const outBundlePath = path.join(DIST, bundleFileName);
+  fs.writeFileSync(outBundlePath, appScript);
+  console.log(`\n  ✓ ${outBundlePath}`);
+  console.log(`    Size: ${humanSize(Buffer.byteLength(appScript))}`);
+
+  // 5. Assemble the HTML (D3 inlined, JS as an external file)
   const assembledHtml = (imageGallery) => `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -253,12 +261,11 @@ ${d3Source}
 <body>
   ${bodyContent}
 ${imageGallery}
-  <script>${appScript}
-  </script>
+  <script src="${bundleFileName}"></script>
 </body>
 </html>`;
 
-  // 6. Assemble the CDN variant (D3 + d3-force-webgpu loaded from CDN)
+  // 6. Assemble the CDN variant (D3 + d3-force-webgpu loaded from CDN, JS as external file)
   const cdnHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -272,8 +279,7 @@ ${css}
 </head>
 <body>
   ${bodyContent}
-  <script>${appScript}
-  </script>
+  <script src="${bundleFileName}"></script>
 </body>
 </html>`;
 
