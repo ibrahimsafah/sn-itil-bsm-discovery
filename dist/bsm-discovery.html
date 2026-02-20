@@ -6386,6 +6386,7 @@ BSMDiscovery.QUERY_FIELDS = {
     'task.number', 'task.type', 'task.risk', 'task.impact',
     'task.u_impact_region', 'task.assignment_group', 'task.business_service',
     'task.sys_created_on',
+    'ci_item.sys_id',
     'ci_item.name', 'ci_item.sys_class_name', 'ci_item.u_role',
     'ci_item.ip_address', 'ci_item.model_id', 'ci_item.os',
     'ci_item.sys_updated_on'
@@ -6452,28 +6453,41 @@ BSMDiscovery.prototype.init = function () {
   var self = this;
 
   // Show loading
-  this._setLoading(true, 'Generating ITIL data\u2026');
+  this._setLoading(true, 'Fetching data from ServiceNow Table API...');
 
-  // Use setTimeout to allow the loading UI to render
-  setTimeout(function () {
-    self._simulator = new ITILDataSimulator(self.simulatorOptions);
+  var api = new SNTableAPI();
+  
+  var queryParts = [];
+  if (BSMDiscovery.QUERY_FIELDS.filter) queryParts.push(BSMDiscovery.QUERY_FIELDS.filter);
+  if (self.simulatorOptions.startDate) queryParts.push('task.sys_created_on>=' + self.simulatorOptions.startDate);
+  if (self.simulatorOptions.endDate) queryParts.push('task.sys_created_on<=' + self.simulatorOptions.endDate);
+  
+  var activeQuery = queryParts.join('^');
+
+  api.getRecords('task_ci', {
+    query: activeQuery,
+    fields: BSMDiscovery.QUERY_FIELDS.task_ci,
+    limit: self.simulatorOptions.limit || 100,
+    displayValue: 'all' // Crucial for our adapter
+  }).then(function(result) {
+    self._setLoading(true, 'Building hypergraph...');
+    
+    // 1. Adapt the incoming SN records to match Simulator format
+    self._rawData = self._adaptSNData(result.records);
+    
+    // 2. Build the graph core
     self._core = new HypergraphCore();
-
-    // Generate data
-    self._setLoading(true, 'Building hypergraph\u2026');
-    self._rawData = self._simulator.generate();
     self._originalGraph = self._core.build(self._rawData);
     self._transposedGraph = self._core.transpose(self._originalGraph);
 
-    // Initialize renderer
+    // 3. Initialize Renderer
     self._renderer = new BSMHypergraphRenderer(self.containerSelector, {
       onNodeClick: function (d) { self._showNodeDetail(d); },
       onHullClick: function (edge) { self._onHyperedgeClick(edge); },
       onStatsUpdate: function (stats, isTransposed) { self._updateStats(stats, isTransposed); }
     });
 
-    // Render original view
-    self._setLoading(true, 'Rendering visualization\u2026');
+    // 4. Start rendering loop (same as original code)
     setTimeout(function () {
       self._renderer.render(self._originalGraph);
       if (!self._controlsBound) {
@@ -6487,7 +6501,7 @@ BSMDiscovery.prototype.init = function () {
       self._updateCooccurrence();
 
       // --- Run analytics ---
-      self._setLoading(true, 'Running analytics\u2026');
+      self._setLoading(true, 'Running analytics...');
       setTimeout(function () {
         self._analytics = new AnalyticsEngine();
 
@@ -6574,10 +6588,51 @@ BSMDiscovery.prototype.init = function () {
         self._setLoading(false);
       }, 50);
     }, 50);
-  }, 50);
+
+  }).catch(function(error) {
+    console.error("API Error", error);
+    self._setLoading(false, "Failed to load ServiceNow data");
+  });
 };
 
 // ---------- View Toggle ----------
+
+/**
+ * Adapter specifically for wrapping ServiceNow Table API JSON results
+ * so they match the flat string dot-walked format expected by HypergraphCore.
+ * Assumes sysparm_display_value=all was used in the API request.
+ */
+BSMDiscovery.prototype._adaptSNData = function(records) {
+  var adaptedRecords = [];
+  
+  for (var i = 0; i < records.length; i++) {
+    var raw = records[i];
+    var adapted = {};
+    var keys = Object.keys(raw);
+    
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      var field = raw[key];
+      
+      // If the field comes back as an object (due to displayValue: 'all')
+      if (field && typeof field === 'object' && field.hasOwnProperty('value')) {
+        // Use raw value for system IDs to avoid using display names as unique IDs
+        if (key === 'ci_item.sys_id' || key === 'task.sys_id') {
+          adapted[key] = field.value || field.display_value || '';
+        } else {
+          // Prefer display_value for UI readability (e.g. assignment_group=Network instead of a sys_id)
+          adapted[key] = field.display_value || field.value || '';
+        }
+      } else {
+        // Fallback if the field is already a flat string
+        adapted[key] = field || '';
+      }
+    }
+    adaptedRecords.push(adapted);
+  }
+  
+  return { taskCiRecords: adaptedRecords, incidents: {} };
+};
 
 BSMDiscovery.prototype.toggleTranspose = function () {
   this.setView(!this._isTransposed);

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GPU ONLY — forceSimulationGPU</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0d1117; overflow: hidden; height: 100vh; }
+    #info { position: fixed; top: 10px; left: 10px; color: #ff8a65; font: 14px monospace; z-index: 10; }
+  </style>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    (function(){var k=['forceSimulation','forceLink','forceManyBody','forceCenter','forceCollide','forceX','forceY'];window.__d3F={};for(var i=0;i<k.length;i++)if(d3[k[i]])window.__d3F[k[i]]=d3[k[i]];})();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-force-webgpu@3.1.2/dist/d3-force-webgpu.min.js"></script>
+  <script>
+    (function(){var g=d3.forceSimulationGPU,a=d3.isWebGPUAvailable,c=d3.checkWebGPUSupport,o=window.__d3F;for(var k in o)if(o.hasOwnProperty(k))d3[k]=o[k];if(g)d3.forceSimulationGPU=g;if(a)d3.isWebGPUAvailable=a;if(c)d3.checkWebGPUSupport=c;delete window.__d3F;})();
+  </script>
+</head>
+<body>
+  <div id="info">GPU ONLY — loading...</div>
+  <script>
+    var W = window.innerWidth, H = window.innerHeight;
+
+    var nodes = [];
+    for (var i = 0; i < 100; i++) {
+      nodes.push({
+        id: 'n' + i,
+        label: 'node-' + i,
+        x: W/2 + (Math.random()-0.5) * W * 0.5,
+        y: H/2 + (Math.random()-0.5) * H * 0.5
+      });
+    }
+
+    var links = [];
+    var seen = new Set();
+    var rng = function(s){return function(){s=(s+0x6d2b79f5)|0;var t=Math.imul(s^s>>>15,1|s);t=(t+Math.imul(t^t>>>7,61|t))^t;return((t^t>>>14)>>>0)/4294967296;};}(42);
+    for (var e = 0; e < 200; e++) {
+      var a = Math.floor(rng()*100), b = Math.floor(rng()*100);
+      if (a===b) continue;
+      var k = Math.min(a,b)+'-'+Math.max(a,b);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      links.push({source:'n'+a, target:'n'+b});
+    }
+
+    var svg = d3.select('body').append('svg').attr('width',W).attr('height',H);
+    var g = svg.append('g');
+    svg.call(d3.zoom().scaleExtent([0.1,8]).on('zoom',function(ev){g.attr('transform',ev.transform);}));
+
+    var hasGPU = typeof d3.forceSimulationGPU === 'function';
+    console.log('forceSimulationGPU available:', hasGPU);
+
+    // Force GPU — no fallback
+    var createSim = hasGPU ? d3.forceSimulationGPU : d3.forceSimulation;
+    var sim = createSim(nodes)
+      .force('link', d3.forceLink(links).id(function(d){return d.id;}).distance(100).strength(0.1))
+      .force('charge', d3.forceManyBody().strength(-400))
+      .force('x', d3.forceX(W/2).strength(0.05))
+      .force('y', d3.forceY(H/2).strength(0.05))
+      .force('collision', d3.forceCollide(14));
+
+    var linkSel = g.append('g').selectAll('line').data(links).enter().append('line')
+      .attr('stroke','#444').attr('stroke-opacity',0.25).attr('stroke-width',0.5);
+    var nodeSel = g.append('g').selectAll('circle').data(nodes).enter().append('circle')
+      .attr('r',6).attr('fill','#ff8a65').attr('stroke','#c75b39').attr('stroke-width',1).attr('cursor','grab')
+      .call(d3.drag()
+        .on('start',function(ev,d){if(!ev.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+        .on('drag',function(ev,d){d.fx=ev.x;d.fy=ev.y;})
+        .on('end',function(ev,d){if(!ev.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+    var labelSel = g.append('g').selectAll('text').data(nodes).enter().append('text')
+      .text(function(d){return d.label;}).attr('text-anchor','middle').attr('dy',18)
+      .attr('fill','#6e7681').attr('font-size','7px').attr('pointer-events','none');
+
+    var tickCount = 0;
+    sim.on('tick', function(){
+      tickCount++;
+      if (tickCount <= 5) {
+        var sample = nodes[0];
+        console.log('tick', tickCount, '→ node[0] x:', sample.x, 'y:', sample.y, 'vx:', sample.vx, 'vy:', sample.vy);
+      }
+      linkSel.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;})
+        .attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});
+      nodeSel.attr('cx',function(d){return d.x;}).attr('cy',function(d){return d.y;});
+      labelSel.attr('x',function(d){return d.x;}).attr('y',function(d){return d.y;});
+    });
+
+    document.getElementById('info').textContent = 'GPU ONLY — ' + nodes.length + ' nodes, ' + links.length + ' links' + (hasGPU ? ' [WebGPU]' : ' [CPU fallback]');
+  </script>
+</body>
+</html>
