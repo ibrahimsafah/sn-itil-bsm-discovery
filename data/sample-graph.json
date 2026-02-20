@@ -1,0 +1,50 @@
+{
+  "nodes": [
+    {
+      "uid": "ci-001",
+      "name": "Web App Server",
+      "type": "ci",
+      "risk": "Medium",
+      "impact": "Medium",
+      "className": "cmdb_ci_compute"
+    },
+    {
+      "uid": "svc-001",
+      "name": "Payments Service",
+      "type": "service",
+      "risk": "High",
+      "impact": "High"
+    },
+    {
+      "uid": "chg-001",
+      "name": "CRQ-1001",
+      "type": "change",
+      "risk": "Low",
+      "impact": "Low"
+    }
+  ],
+  "edges": [
+    {
+      "uid": "edge-1",
+      "name": "Change Hyperedge 1",
+      "type": "change",
+      "risk": "Medium",
+      "elements": ["ci-001", "chg-001", "svc-001"]
+    }
+  ],
+  "incidence": {
+    "ci-001": ["edge-1"],
+    "svc-001": ["edge-1"],
+    "chg-001": ["edge-1"]
+  },
+  "stats": {
+    "totalNodes": 3,
+    "totalEdges": 1,
+    "density": 0,
+    "avgDegree": 0,
+    "maxDegree": 0,
+    "avgEdgeSize": 0,
+    "isTransposed": false
+  },
+  "isTransposed": false
+}
