@@ -111,29 +111,33 @@ ITILDataSimulator.SERVICES = [
 ITILDataSimulator.CI_TEMPLATES = {
   linux_server: {
     names: ['web-lnx', 'app-lnx', 'db-lnx', 'api-lnx', 'batch-lnx', 'cache-lnx', 'mq-lnx', 'etl-lnx', 'log-lnx', 'mon-lnx',
-            'proxy-lnx', 'auth-lnx', 'search-lnx', 'report-lnx', 'vault-lnx', 'ci-lnx'],
+            'proxy-lnx', 'auth-lnx', 'search-lnx', 'report-lnx', 'vault-lnx', 'ci-lnx',
+            'build-lnx', 'deploy-lnx', 'queue-lnx', 'sched-lnx', 'metric-lnx', 'git-lnx', 'nfs-lnx', 'kafka-lnx', 'redis-lnx', 'nginx-lnx'],
     osOptions: ['RHEL 8.6', 'RHEL 9.1', 'Ubuntu 22.04', 'CentOS 7.9'],
     models: ['Dell PowerEdge R640', 'Dell PowerEdge R740', 'HP ProLiant DL380 Gen10', 'VMware vSphere VM']
   },
   windows_server: {
     names: ['dc-win', 'file-win', 'print-win', 'app-win', 'sql-win', 'iis-win', 'exchange-win', 'sccm-win', 'rds-win', 'wsus-win',
-            'ad-win', 'dns-win'],
+            'ad-win', 'dns-win', 'hyper-win', 'rdgw-win', 'ca-win', 'wds-win', 'dfs-win', 'nps-win', 'dhcp-win', 'ftp-win'],
     osOptions: ['Windows Server 2019', 'Windows Server 2022'],
     models: ['Dell PowerEdge R640', 'HP ProLiant DL360 Gen10', 'VMware vSphere VM']
   },
   network_gear: {
-    names: ['core-sw', 'dist-sw', 'access-sw', 'fw', 'lb', 'router', 'vpn-gw', 'wlan-ctrl', 'edge-sw', 'mgmt-sw'],
+    names: ['core-sw', 'dist-sw', 'access-sw', 'fw', 'lb', 'router', 'vpn-gw', 'wlan-ctrl', 'edge-sw', 'mgmt-sw',
+            'leaf-sw', 'spine-sw', 'border-gw', 'ids-probe', 'waf', 'nac', 'ips-sensor', 'sdwan-gw'],
     osOptions: ['IOS-XE 17.6', 'NX-OS 10.2', 'FortiOS 7.2', 'PAN-OS 11.0'],
     models: ['Cisco Catalyst 9300', 'Cisco Nexus 9000', 'Fortinet FortiGate 600E', 'Palo Alto PA-5250', 'F5 BIG-IP i5800']
   },
   storage: {
-    names: ['san', 'nas', 'backup-store', 'archive', 'object-store', 'block-store'],
+    names: ['san', 'nas', 'backup-store', 'archive', 'object-store', 'block-store',
+            'tape-lib', 'dedup-store', 'snap-store', 'tier-store', 'ceph-store', 'gluster-store'],
     osOptions: ['ONTAP 9.12', 'PowerStore OS 3.0', 'Veeam B&R 12'],
     models: ['NetApp FAS8700', 'Dell PowerStore 500T', 'Pure Storage FlashArray//X70', 'HPE Nimble HF40']
   },
   application: {
     names: ['erp-app', 'crm-app', 'portal-app', 'bi-app', 'hrms-app', 'email-app', 'collab-app', 'workflow-app',
-            'analytics-app', 'payment-app', 'inventory-app', 'ticketing-app'],
+            'analytics-app', 'payment-app', 'inventory-app', 'ticketing-app',
+            'sso-app', 'cms-app', 'chat-app', 'notify-app', 'search-app', 'media-app', 'report-app', 'audit-app', 'budget-app', 'fleet-app', 'vendor-app', 'itsm-app'],
     osOptions: ['Java 17 / Tomcat 10', 'Node.js 20 LTS', '.NET 8', 'Python 3.11 / Django 5'],
     models: ['Kubernetes Pod', 'Docker Container', 'Azure App Service', 'AWS ECS Task']
   }
@@ -203,6 +207,7 @@ ITILDataSimulator.prototype._flattenToTaskCi = function (changes) {
         'task.impact':            chg.impact,
         'task.u_impact_region':   chg.region,
         'task.assignment_group':  chg.assignmentGroup.name,
+        'task.business_service':  chg.businessService.name,
         'task.sys_created_on':    chg.createdAt,
         'ci_item.sys_id':         ci.id,
         'ci_item.name':           ci.name,
@@ -210,6 +215,7 @@ ITILDataSimulator.prototype._flattenToTaskCi = function (changes) {
         'ci_item.u_role':         ci.role,
         'ci_item.ip_address':     ci.ipAddress,
         'ci_item.model_id':       ci.model,
+        'ci_item.os':             ci.os,
         'ci_item.sys_updated_on': ci.sysUpdatedOn
       });
     }

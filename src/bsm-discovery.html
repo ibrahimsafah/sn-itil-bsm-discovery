@@ -39,16 +39,24 @@
 
       <!-- View Toggle -->
       <div class="sidebar-section">
-        <h3>Perspective</h3>
+        <h3>Visualization</h3>
         <div class="view-toggle">
-          <button id="btn-original" class="active">Entities → Changes</button>
-          <button id="btn-transposed">Changes → Entities</button>
+          <button id="btn-view-matrix" class="active">Incidence Matrix</button>
+          <button id="btn-view-explorer">Hyperedge Explorer</button>
         </div>
         <div class="view-toggle" style="margin-top: 6px;">
-          <button id="btn-upset" title="UpSet intersection plot">UpSet Intersections</button>
+          <button id="btn-view-force">Force Graph</button>
+          <button id="btn-view-upset" title="UpSet intersection plot">UpSet</button>
+        </div>
+        <div style="margin-top: 10px;">
+          <h3 style="margin-bottom: 6px;">Projection</h3>
+          <div class="view-toggle" id="projection-toggle">
+            <button id="btn-original">Entities → Changes</button>
+            <button id="btn-transposed">Changes → Entities</button>
+          </div>
         </div>
         <div style="margin-top: 8px; text-align: center;">
-          <span id="view-label" style="font-size: 10px; color: var(--text-muted);">Original (H)</span>
+          <span id="view-label" style="font-size: 10px; color: var(--text-muted);">Incidence Matrix</span>
         </div>
       </div>
 
@@ -118,6 +126,15 @@
         </div>
       </div>
 
+      <!-- Hull Toggle -->
+      <div class="sidebar-section" id="hull-section">
+        <h3>Hyperedge Hulls</h3>
+        <label class="hull-toggle-label">
+          <input type="checkbox" id="hull-toggle" checked>
+          <span>Show convex hulls</span>
+        </label>
+      </div>
+
       <!-- Co-occurrence -->
       <div class="sidebar-section" id="cooccurrence-section">
         <h3>CI Co-occurrence</h3>
@@ -131,7 +148,7 @@
       </div>
 
       <!-- Force Controls -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="force-controls-section">
         <h3>Force Controls</h3>
         <div class="control-group">
           <div class="control-label">
@@ -167,6 +184,7 @@
         <div class="loading-spinner"></div>
         <div class="loading-text" id="loading-text">Initializing…</div>
       </div>
+      <div class="hypergraph-view hidden" id="hypergraph-view"></div>
       <button class="analytics-toggle-btn" id="analytics-toggle" title="Toggle Analytics Panel">Analytics ▶</button>
     </main>
 
@@ -295,16 +313,31 @@
   </div>
 
   <!-- Application Scripts -->
+  <!-- Core -->
   <script src="ITILDataSimulator.js"></script>
   <script src="HypergraphCore.js"></script>
   <script src="BSMHypergraphRenderer.js"></script>
-  <script src="AnalyticsEngine.js"></script>
+  <!-- Analytics engine (base + extensions) -->
+  <script src="analytics/AnalyticsEngine.js"></script>
+  <script src="analytics/CentralityAnalysis.js"></script>
+  <script src="analytics/TemporalAnalysis.js"></script>
+  <script src="analytics/CooccurrenceAnalysis.js"></script>
+  <script src="analytics/AnomalyDetection.js"></script>
+  <script src="analytics/RiskAnalysis.js"></script>
+  <script src="analytics/CommunityDetection.js"></script>
+  <script src="analytics/ImpactPrediction.js"></script>
+  <script src="analytics/IncidentCorrelation.js"></script>
+  <!-- UpSet chart -->
   <script src="UpSetRenderer.js"></script>
-  <script src="BSMDiscovery.js"></script>
+  <!-- App (base + extensions) -->
+  <script src="app/BSMDiscovery.js"></script>
+  <script src="app/BSMDiscoveryControls.js"></script>
+  <script src="app/BSMDiscoveryAnalytics.js"></script>
+  <script src="app/BSMDiscoveryUpSet.js"></script>
   <script>
     var app = new BSMDiscovery({
       container: '#graph-container',
-      simulator: { changeCount: 200, incidentCount: 80, seed: 42, limit: 100 }
+      simulator: { changeCount: 150, incidentCount: 30, seed: 42, limit: 150 }
     });
     app.init();
 

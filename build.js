@@ -190,12 +190,27 @@ async function build() {
   console.log('  Reading source files...');
   const css = readSrc('bsm-discovery.css');
   const jsFiles = [
+    // Core
     'ITILDataSimulator.js',
     'HypergraphCore.js',
     'BSMHypergraphRenderer.js',
-    'AnalyticsEngine.js',
+    // Analytics engine (base + extensions)
+    'analytics/AnalyticsEngine.js',
+    'analytics/CentralityAnalysis.js',
+    'analytics/TemporalAnalysis.js',
+    'analytics/CooccurrenceAnalysis.js',
+    'analytics/AnomalyDetection.js',
+    'analytics/RiskAnalysis.js',
+    'analytics/CommunityDetection.js',
+    'analytics/ImpactPrediction.js',
+    'analytics/IncidentCorrelation.js',
+    // UpSet chart
     'UpSetRenderer.js',
-    'BSMDiscovery.js',
+    // App (base + extensions)
+    'app/BSMDiscovery.js',
+    'app/BSMDiscoveryControls.js',
+    'app/BSMDiscoveryAnalytics.js',
+    'app/BSMDiscoveryUpSet.js',
   ];
   const jsModules = jsFiles.map((f) => ({
     name: f,
@@ -216,21 +231,9 @@ async function build() {
   const bodyContent = html.substring(bodyStart, scriptsStart).trim();
 
   // 4. App script block (shared by all variants)
-  const appScript = `
-/* ── ITILDataSimulator ── */
-${jsModules[0].source}
-/* ── HypergraphCore ── */
-${jsModules[1].source}
-/* ── BSMHypergraphRenderer ── */
-${jsModules[2].source}
-/* ── AnalyticsEngine ── */
-${jsModules[3].source}
-/* ── UpSetRenderer ── */
-${jsModules[4].source}
-/* ── BSMDiscovery ── */
-${jsModules[5].source}
-/* ── Init ── */
-${initScript}`;
+  const appScript = jsModules.map((mod) =>
+    `/* ── ${mod.name} ── */\n${mod.source}`
+  ).join('\n') + `\n/* ── Init ── */\n${initScript}`;
 
   // 5. Assemble the self-contained HTML (D3 inlined)
   const assembledHtml = (imageGallery) => `<!DOCTYPE html>
@@ -255,7 +258,7 @@ ${imageGallery}
 </body>
 </html>`;
 
-  // 6. Assemble the CDN variant (D3 loaded from CDN)
+  // 6. Assemble the CDN variant (D3 + d3-force-webgpu loaded from CDN)
   const cdnHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>

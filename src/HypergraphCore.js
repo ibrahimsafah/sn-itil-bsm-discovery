@@ -55,6 +55,7 @@ HypergraphCore.prototype.build = function (data) {
         ipAddress: rec['ci_item.ip_address'],
         role: rec['ci_item.u_role'],
         model: rec['ci_item.model_id'],
+        os: rec['ci_item.os'],
         sysUpdatedOn: rec['ci_item.sys_updated_on']
       };
       nodes.push(node);
@@ -76,6 +77,7 @@ HypergraphCore.prototype.build = function (data) {
         impact: r['task.impact'],
         region: r['task.u_impact_region'],
         assignmentGroup: r['task.assignment_group'],
+        businessService: r['task.business_service'],
         createdAt: r['task.sys_created_on'],
         ciUids: []
       };
@@ -103,6 +105,7 @@ HypergraphCore.prototype.build = function (data) {
       impact: chg.impact,
       region: chg.region,
       assignmentGroup: chg.assignmentGroup,
+      businessService: chg.businessService,
       createdAt: chg.createdAt
     };
     edges.push(edge);
@@ -151,6 +154,7 @@ HypergraphCore.prototype.transpose = function (graph) {
       impact: oldEdge.impact,
       region: oldEdge.region,
       assignmentGroup: oldEdge.assignmentGroup,
+      businessService: oldEdge.businessService,
       createdAt: oldEdge.createdAt
     });
     newIncidence[oldEdge.uid] = new Set();
@@ -169,7 +173,8 @@ HypergraphCore.prototype.transpose = function (graph) {
       type: oldNode.type,
       name: oldNode.name,
       className: oldNode.className,
-      ipAddress: oldNode.ipAddress
+      ipAddress: oldNode.ipAddress,
+      os: oldNode.os
     });
 
     // Populate transposed incidence

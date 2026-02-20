@@ -35,21 +35,21 @@ function UpSetRenderer(containerSelector, options) {
   this._currentGraph = null;
   this._lastRenderOptions = null;
 
-  // Color scheme (matches existing app dark theme)
+  // Color scheme (light theme)
   this._colors = {
     ci: '#4fc3f7',
     group: '#ffb74d',
     service: '#81c784',
     change: '#ce93d8',
-    bar: '#4fc3f7',
-    barMuted: 'rgba(79, 195, 247, 0.55)',
-    dotEmpty: '#21262d',
-    connector: '#6e7681',
-    text: '#e6edf3',
-    textSecondary: '#8b949e',
-    textMuted: '#6e7681',
-    gridLine: '#30363d',
-    rowEven: 'rgba(33, 38, 45, 0.35)',
+    bar: '#0ea5e9',
+    barMuted: 'rgba(14, 165, 233, 0.45)',
+    dotEmpty: '#d6deea',
+    connector: '#94a3b8',
+    text: '#0f172a',
+    textSecondary: '#334155',
+    textMuted: '#64748b',
+    gridLine: '#d1d9e6',
+    rowEven: 'rgba(148, 163, 184, 0.08)',
     rowOdd: 'transparent'
   };
 
@@ -588,7 +588,7 @@ UpSetRenderer.prototype._highlightColumn = function (colIdx, numRows, matrixX, m
     .attr('y', 0)
     .attr('width', colWidth)
     .attr('height', height)
-    .attr('fill', 'rgba(79, 195, 247, 0.08)')
+    .attr('fill', 'rgba(14, 165, 233, 0.12)')
     .attr('pointer-events', 'none');
 };
 
@@ -615,7 +615,7 @@ UpSetRenderer.prototype._highlightRow = function (rowIdx, numCols, matrixX, matr
     .attr('y', y)
     .attr('width', matrixWidth)
     .attr('height', rowHeight)
-    .attr('fill', 'rgba(79, 195, 247, 0.08)')
+    .attr('fill', 'rgba(14, 165, 233, 0.12)')
     .attr('pointer-events', 'none');
 };
 
