@@ -116,6 +116,18 @@ BSMDiscovery.prototype._bindControls = function () {
     });
   }
 
+  var visualStyleSelect = document.getElementById('visual-style-select');
+  if (visualStyleSelect) {
+    if (self._renderer && self._renderer._visualStylePreset) {
+      visualStyleSelect.value = self._renderer._visualStylePreset;
+    }
+    visualStyleSelect.addEventListener('change', function () {
+      if (self._renderer && self._renderer.setVisualPreset) {
+        self._renderer.setVisualPreset(visualStyleSelect.value);
+      }
+    });
+  }
+
   // Query parameter controls
   var queryApplyBtn = document.getElementById('query-apply');
   if (queryApplyBtn) {

@@ -133,6 +133,19 @@
           <input type="checkbox" id="hull-toggle" checked>
           <span>Show convex hulls</span>
         </label>
+        <div class="control-group" style="margin-top: 10px;">
+          <div class="control-label">
+            <span>Hypergraph Style Preset</span>
+          </div>
+          <select id="visual-style-select" class="analytics-select">
+            <option value="soft-region" selected>Soft Region + Thin Links</option>
+            <option value="outline">Outline-Only Hulls + Bold Edges</option>
+            <option value="contour">Contour Bands</option>
+            <option value="weighted">Ribbon-Like Weighted Edges</option>
+            <option value="emphasis">Muted Hulls + Emphasis Edges</option>
+            <option value="glow">Glow Edges</option>
+          </select>
+        </div>
       </div>
 
       <!-- Co-occurrence -->
