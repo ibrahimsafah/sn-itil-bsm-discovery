@@ -124,6 +124,7 @@ BSMDiscovery.prototype.init = function () {
     // Initialize renderer
     self._renderer = new BSMHypergraphRenderer(self.containerSelector, {
       onNodeClick: function (d) { self._showNodeDetail(d); },
+      onHullClick: function (edge) { self._onHyperedgeClick(edge); },
       onStatsUpdate: function (stats, isTransposed) { self._updateStats(stats, isTransposed); }
     });
 

@@ -225,6 +225,7 @@ BSMDiscovery.prototype._updateLegendCounts = function () {
 BSMDiscovery.prototype._showNodeDetail = function (d) {
   var panel = document.getElementById('node-detail');
   if (!panel) return;
+  var headerEl = panel.querySelector('.node-detail-header h3');
 
   var nameEl = document.getElementById('detail-name');
   var badgeEl = document.getElementById('detail-badge');
@@ -235,6 +236,7 @@ BSMDiscovery.prototype._showNodeDetail = function (d) {
     badgeEl.textContent = d.type;
     badgeEl.className = 'node-detail-badge ' + d.type;
   }
+  if (headerEl) headerEl.textContent = 'Node Detail';
 
   var rows = [];
   var props = { uid: 'UID', className: 'Class', ipAddress: 'IP Address', model: 'Model', role: 'Role', os: 'OS', risk: 'Risk', impact: 'Impact', changeType: 'Type', region: 'Region', assignmentGroup: 'Group', businessService: 'Service', sysUpdatedOn: 'Updated', createdAt: 'Created' };
@@ -262,9 +264,63 @@ BSMDiscovery.prototype._showNodeDetail = function (d) {
   panel.classList.add('visible');
 };
 
+BSMDiscovery.prototype._onHyperedgeClick = function (edge) {
+  if (!edge || !this._renderer) return;
+
+  var graph = this._isTransposed ? this._transposedGraph : this._originalGraph;
+  var selectedEdge = this._findEdgeByUid(graph, edge.uid) || edge;
+  if (!selectedEdge) return;
+
+  if (this._selectedHyperedgeUid === selectedEdge.uid) {
+    this._selectedHyperedgeUid = null;
+    this._renderer.clearHighlight();
+    this._hideNodeDetail();
+    return;
+  }
+
+  this._selectedHyperedgeUid = selectedEdge.uid;
+  this._renderer.highlightHyperedge(selectedEdge);
+  this._showHyperedgeDetail(selectedEdge);
+};
+
+BSMDiscovery.prototype._showHyperedgeDetail = function (edge) {
+  var panel = document.getElementById('node-detail');
+  if (!panel) return;
+  var graph = this._isTransposed ? this._transposedGraph : this._originalGraph;
+  if (!graph) return;
+
+  var headerEl = panel.querySelector('.node-detail-header h3');
+  var nameEl = document.getElementById('detail-name');
+  var badgeEl = document.getElementById('detail-badge');
+  var bodyEl = document.getElementById('detail-body');
+
+  var nodeById = {};
+  for (var i = 0; i < graph.nodes.length; i++) {
+    nodeById[graph.nodes[i].uid] = graph.nodes[i];
+  }
+
+  if (headerEl) headerEl.textContent = 'Hyperedge Detail';
+  if (nameEl) nameEl.textContent = edge.number || edge.uid;
+  if (badgeEl) {
+    badgeEl.textContent = 'hyperedge';
+    badgeEl.className = 'node-detail-badge change';
+  }
+
+  if (bodyEl && typeof this._renderHyperedgeDetail === 'function') {
+    bodyEl.innerHTML = this._renderHyperedgeDetail(edge, nodeById);
+  } else if (bodyEl) {
+    bodyEl.innerHTML = '<div class="hyperedge-detail"><h4>' + (edge.number || edge.uid) + '</h4></div>';
+  }
+
+  panel.classList.add('visible');
+};
+
 BSMDiscovery.prototype._hideNodeDetail = function () {
   var panel = document.getElementById('node-detail');
   if (panel) panel.classList.remove('visible');
+  var headerEl = panel ? panel.querySelector('.node-detail-header h3') : null;
+  if (headerEl) headerEl.textContent = 'Node Detail';
+  this._selectedHyperedgeUid = null;
 };
 
 // ---------- Co-occurrence Panel ----------

@@ -865,7 +865,8 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* Hull paths */
 .hg-hull {
-  pointer-events: none;
+  pointer-events: all;
+  cursor: pointer;
   transition: fill-opacity 0.3s ease;
 }
 

@@ -20,6 +20,7 @@ function BSMHypergraphRenderer(containerSelector, options) {
   this.svg = null;
   this.currentGraph = null;
   this._onNodeClick = options.onNodeClick || null;
+  this._onHullClick = options.onHullClick || null;
   this._onStatsUpdate = options.onStatsUpdate || null;
 
   this._colors = {
@@ -34,6 +35,7 @@ function BSMHypergraphRenderer(containerSelector, options) {
   this._labelLayer = null;
   this._linkSel = null;
   this._hullSel = null;
+  this._selectedHullUid = null;
   this._tooltip = null;
   this._nodeById = null;
   this._maxLinkWeight = 1;
@@ -378,7 +380,13 @@ BSMHypergraphRenderer.prototype.render = function (graph) {
     .enter().append('path')
     .attr('class', 'hg-hull')
     .attr('fill', function (e) { return hullRiskColors[e.risk] || '#94a3b8'; })
-    .attr('stroke', function (e) { return hullRiskColors[e.risk] || '#94a3b8'; });
+    .attr('stroke', function (e) { return hullRiskColors[e.risk] || '#94a3b8'; })
+    .on('mouseover', function (event, e) { self._showHullTooltip(event, e); })
+    .on('mouseout', function () { self._hideTooltip(); })
+    .on('click', function (event, e) {
+      event.stopPropagation();
+      if (self._onHullClick) self._onHullClick(e);
+    });
   this._hullSel = hullSel;
   this._hullEdges = hullEdges;
   this._linkSel = linkSel;
@@ -534,6 +542,23 @@ BSMHypergraphRenderer.prototype._hideTooltip = function () {
   this._tooltip.transition().duration(200).style('opacity', 0);
 };
 
+BSMHypergraphRenderer.prototype._showHullTooltip = function (event, e) {
+  var lines = ['<strong>' + (e.number || e.uid) + '</strong>'];
+  lines.push('<span class="hg-tooltip-type">Hyperedge</span>');
+  lines.push('Members: ' + (e.elements ? e.elements.length : 0));
+  if (e.risk) lines.push('Risk: ' + e.risk);
+  if (e.impact) lines.push('Impact: ' + e.impact);
+  if (e.assignmentGroup) lines.push('Group: ' + e.assignmentGroup);
+  if (e.businessService) lines.push('Service: ' + e.businessService);
+  if (e.createdAt) lines.push('Created: ' + e.createdAt);
+
+  this._tooltip
+    .html(lines.join('<br>'))
+    .style('left', (event.pageX + 12) + 'px')
+    .style('top', (event.pageY - 12) + 'px')
+    .transition().duration(150).style('opacity', 1);
+};
+
 // ──────────────────────────────────────────────
 //  Highlight connected nodes on click
 // ──────────────────────────────────────────────
@@ -541,6 +566,7 @@ BSMHypergraphRenderer.prototype._hideTooltip = function () {
 BSMHypergraphRenderer.prototype._highlightConnected = function (d) {
   var connected = new Set();
   connected.add(d.uid);
+  var self = this;
 
   var connectedEdges = new Set();
   if (this.currentGraph && this.currentGraph.incidence[d.uid]) {
@@ -581,8 +607,44 @@ BSMHypergraphRenderer.prototype._highlightConnected = function (d) {
   }
 };
 
+BSMHypergraphRenderer.prototype.highlightHyperedge = function (edge) {
+  if (!edge || !this._nodeLayer) return;
+  if (!this._hullSel) {
+    this.clearHighlight();
+    return;
+  }
+
+  var style = this._getVisualStyle();
+  this._selectedHullUid = edge.uid || null;
+
+  var connected = new Set(edge.elements || []);
+  var connectedEdges = new Set([edge.uid]);
+
+  this._nodeLayer.selectAll('circle')
+    .attr('opacity', function (n) { return connected.has(n.uid) ? 1 : 0.08; })
+    .attr('filter', function (n) { return connected.has(n.uid) ? 'url(#glow)' : null; });
+  this._labelLayer.selectAll('text')
+    .attr('opacity', function (n) { return connected.has(n.uid) ? 1 : 0.1; });
+  this._linkLayer.selectAll('line')
+    .attr('stroke-opacity', function (l) {
+      var sUid = l.source.uid || l.source;
+      var tUid = l.target.uid || l.target;
+      return connected.has(sUid) && connected.has(tUid)
+        ? Math.min(1, style.link.strokeOpacity * (style.highlight.linkActiveScale || 1.25))
+        : Math.max(0.01, style.link.strokeOpacity * (style.highlight.linkInactiveScale || 0.1));
+    });
+  this._hullSel
+    .attr('fill-opacity', function (e) {
+      return connectedEdges.has(e.uid) ? style.hull.fillOpacity * (style.highlight.hullFillScale || 1.6) : style.hull.fillOpacity * 0.08;
+    })
+    .attr('stroke-opacity', function (e) {
+      return connectedEdges.has(e.uid) ? style.hull.strokeOpacity * (style.highlight.hullStrokeScale || 1.15) : style.hull.strokeOpacity * 0.15;
+    });
+};
+
 BSMHypergraphRenderer.prototype.clearHighlight = function () {
   if (!this._nodeLayer) return;
+  this._selectedHullUid = null;
   this._nodeLayer.selectAll('circle').attr('opacity', 1).attr('filter', null);
   this._labelLayer.selectAll('text').attr('opacity', 1);
   this._linkLayer.selectAll('line').attr('stroke-opacity', this._getVisualStyle().link.strokeOpacity);
@@ -594,6 +656,7 @@ BSMHypergraphRenderer.prototype.clearHighlight = function () {
 
 BSMHypergraphRenderer.prototype.highlightNodes = function (nodeUids) {
   var set = new Set(nodeUids || []);
+  var self = this;
   if (set.size === 0) { this.clearHighlight(); return; }
   this._nodeLayer.selectAll('circle')
     .attr('opacity', function (n) { return set.has(n.uid) ? 1 : 0.12; })

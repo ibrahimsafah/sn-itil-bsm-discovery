@@ -356,7 +356,7 @@
 
     // Wire up detail close button
     document.getElementById('detail-close').addEventListener('click', function () {
-      document.getElementById('node-detail').classList.remove('visible');
+      app._hideNodeDetail();
       app._renderer.clearHighlight();
     });
   </script>
