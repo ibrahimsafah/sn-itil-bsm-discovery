@@ -111,7 +111,7 @@
             <span>Hypergraph Style Preset</span>
           </div>
           <select id="visual-style-select" class="analytics-select">
-            <option value="soft-region" selected>Soft Region + Thin Links</option>
+            <option value="soft-region" selected="selected">Soft Region + Thin Links</option>
             <option value="outline">Outline-Only Hulls + Bold Edges</option>
             <option value="contour">Contour Bands</option>
             <option value="weighted">Ribbon-Like Weighted Edges</option>
@@ -123,7 +123,7 @@
 
       <!-- Co-occurrence -->
       <div class="sidebar-section" id="cooccurrence-section">
-        <h3>CI Co-occurrence</h3>
+        <h3>CI Groups</h3>
         <div class="cooccurrence-filter">
           <button class="cooccurrence-type-btn active" data-filter="">All</button>
           <button class="cooccurrence-type-btn" data-filter="ci">CIs</button>
@@ -213,7 +213,7 @@
         <div class="analytics-tab-content" id="tab-temporal">
           <div class="analytics-sub-section">
             <h4>Change Cascades</h4>
-            <div class="analytics-description">CI pairs where changes to one frequently trigger changes to another
+            <div class="analytics-description">CI groups where changes to one frequently trigger changes to another
               within 7 days</div>
             <div id="cascade-list"></div>
           </div>
@@ -232,8 +232,8 @@
             <div id="risk-heatmap"></div>
           </div>
           <div class="analytics-sub-section">
-            <h4>Unexpected Pairs</h4>
-            <div class="analytics-description">CI pairs that co-occur far more than statistically expected</div>
+            <h4>Unexpected Groups</h4>
+            <div class="analytics-description">CI groups that occur together far more than statistically expected</div>
             <div id="unexpected-pairs"></div>
           </div>
           <div class="analytics-sub-section">
@@ -243,7 +243,7 @@
             <div id="orphan-list"></div>
           </div>
           <div class="analytics-sub-section">
-            <h4>Over-Coupled Pairs</h4>
+            <h4>Over-Coupled Groups</h4>
             <div class="analytics-description">CIs with Jaccard similarity > 0.5 — excessive dependency risk</div>
             <div id="overcoupled-list"></div>
           </div>
@@ -273,8 +273,8 @@
             <div id="impact-results"></div>
           </div>
           <div class="analytics-sub-section">
-            <h4>Predicted Links</h4>
-            <div class="analytics-description">CI pairs likely to appear together in future changes (Adamic-Adar index)
+            <h4>Predicted Groups</h4>
+            <div class="analytics-description">CI groups likely to appear together in future changes (Adamic-Adar index)
             </div>
             <div id="predicted-links"></div>
           </div>

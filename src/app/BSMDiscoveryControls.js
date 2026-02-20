@@ -332,7 +332,7 @@ BSMDiscovery.prototype._updateCooccurrence = function () {
   var pairs = this._core.cooccurrence(graph, filter, 15);
 
   if (pairs.length === 0) {
-    body.innerHTML = '<div class="cooccurrence-empty">No co-occurring pairs found</div>';
+    body.innerHTML = '<div class="cooccurrence-empty">No co-occurring groups found</div>';
     return;
   }
 
@@ -349,7 +349,7 @@ BSMDiscovery.prototype._updateCooccurrence = function () {
   }
 
   var html = '<table class="cooccurrence-table">';
-  html += '<tr><th>Pair</th><th></th><th>Shared</th></tr>';
+  html += '<tr><th>Group</th><th></th><th>Shared</th></tr>';
 
   var self = this;
   for (var i = 0; i < pairs.length; i++) {
