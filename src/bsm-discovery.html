@@ -1,10 +1,7 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BSM Hypergraph Discovery</title>
-  <link rel="stylesheet" href="bsm-discovery.css">
+  <link rel="stylesheet" href="bsm-discovery.css" />
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
@@ -22,15 +19,15 @@
         <div class="query-params">
           <div class="query-param-row">
             <label for="query-limit">sysparm_limit</label>
-            <input type="number" id="query-limit" class="query-input" value="100" min="10" max="500" step="10">
+            <input type="number" id="query-limit" class="query-input" value="100" min="10" max="500" step="10" />
           </div>
           <div class="query-param-row">
             <label for="query-start">sys_created_on &gt;=</label>
-            <input type="date" id="query-start" class="query-input" value="2025-01-15">
+            <input type="date" id="query-start" class="query-input" value="2025-01-15" />
           </div>
           <div class="query-param-row">
             <label for="query-end">sys_created_on &lt;=</label>
-            <input type="date" id="query-end" class="query-input" value="2025-04-15">
+            <input type="date" id="query-end" class="query-input" value="2025-04-15" />
           </div>
           <button id="query-apply" class="query-apply-btn">Apply Query</button>
           <div class="query-encoded" id="query-encoded"></div>
@@ -96,7 +93,7 @@
       <!-- Search -->
       <div class="sidebar-section">
         <h3>Search</h3>
-        <input type="text" id="search-input" class="search-input" placeholder="Filter nodes by name…">
+        <input type="text" id="search-input" class="search-input" placeholder="Filter nodes by name…" />
       </div>
 
       <!-- Legend -->
@@ -130,7 +127,7 @@
       <div class="sidebar-section" id="hull-section">
         <h3>Hyperedge Hulls</h3>
         <label class="hull-toggle-label">
-          <input type="checkbox" id="hull-toggle" checked>
+          <input type="checkbox" id="hull-toggle" checked="checked" />
           <span>Show convex hulls</span>
         </label>
         <div class="control-group" style="margin-top: 10px;">
@@ -168,14 +165,14 @@
             <span>Repulsion</span>
             <span class="control-value" id="charge-value">-350</span>
           </div>
-          <input type="range" id="charge-slider" min="-600" max="-50" value="-350" step="10">
+          <input type="range" id="charge-slider" min="-600" max="-50" value="-350" step="10" />
         </div>
         <div class="control-group">
           <div class="control-label">
             <span>Link Distance</span>
             <span class="control-value" id="link-value">180</span>
           </div>
-          <input type="range" id="link-slider" min="40" max="400" value="180" step="10">
+          <input type="range" id="link-slider" min="40" max="400" value="180" step="10" />
         </div>
       </div>
 

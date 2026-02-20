@@ -75,7 +75,7 @@ function buildImageGallery() {
     const dataUri = imageToBase64(path.join(ROOT, f));
     const label = f.replace('.png', '').replace(/-/g, ' ');
     return `        <figure class="gallery-fig">
-          <img src="${dataUri}" alt="${label}" loading="lazy">
+          <img src="${dataUri}" alt="${label}" loading="lazy" />
           <figcaption>${label}</figcaption>
         </figure>`;
   });
@@ -244,11 +244,8 @@ async function build() {
   console.log(`    Size: ${humanSize(Buffer.byteLength(appScript))}`);
 
   // 5. Assemble the HTML (D3 inlined, JS as an external file)
-  const assembledHtml = (imageGallery) => `<!DOCTYPE html>
-<html lang="en">
+  const assembledHtml = (imageGallery) => `<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BSM Hypergraph Discovery</title>
   <style>
 ${css}
@@ -266,11 +263,8 @@ ${imageGallery}
 </html>`;
 
   // 6. Assemble the CDN variant (D3 + d3-force-webgpu loaded from CDN, JS as external file)
-  const cdnHtml = `<!DOCTYPE html>
-<html lang="en">
+  const cdnHtml = `<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BSM Hypergraph Discovery</title>
   <style>
 ${css}
